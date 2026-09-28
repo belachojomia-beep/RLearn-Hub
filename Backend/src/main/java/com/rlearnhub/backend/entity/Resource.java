@@ -1,4 +1,4 @@
-package com.rlearnhub.resource.entity;
+package com.rlearnhub.backend.entity;
 
 import jakarta.persistence.*;
 

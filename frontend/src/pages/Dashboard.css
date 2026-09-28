@@ -334,9 +334,8 @@
 
   padding: 32px 38px;
 
-  overflow-x: hidden;
+  overflow-x: visible;
 }
-
 
 /* =========================================================
    WELCOME
@@ -352,6 +351,8 @@
   gap: 20px;
 
   position: relative;
+
+  z-index: 1001;
 }
 
 

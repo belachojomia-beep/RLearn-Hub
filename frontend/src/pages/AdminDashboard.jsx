@@ -1,23 +1,9 @@
-
 import React, { useEffect, useState } from "react";
 import "./AdminDashboard.css";
 
-const announcements = [
-  {
-    id: 1,
-    title: "System Maintenance",
-    date: "September 26, 2026",
-    message:
-      "RLearn-Hub will undergo scheduled maintenance this weekend.",
-  },
-  {
-    id: 2,
-    title: "New Learning Resources",
-    date: "September 25, 2026",
-    message:
-      "New educational resources are now available in the library.",
-  },
-];
+const BACKEND_API = "http://localhost:8080";
+const ANNOUNCEMENT_API =
+  "http://localhost:8080/api/announcements";
 
 function AdminDashboard({ user, onLogout }) {
   const adminName = user?.name || "Administrator";
@@ -25,7 +11,42 @@ function AdminDashboard({ user, onLogout }) {
   const [activePage, setActivePage] = useState("Dashboard");
 
   // =========================================================
-  // RECENT RESOURCES STATE
+  // DASHBOARD VIEW ALL STATES
+  // =========================================================
+
+  const [showAllRecentResources, setShowAllRecentResources] =
+    useState(false);
+
+  const [showAllDashboardAnnouncements, setShowAllDashboardAnnouncements] =
+    useState(false);
+
+  const [showAllDashboardApprovals, setShowAllDashboardApprovals] =
+    useState(false);
+
+  // =========================================================
+  // ANNOUNCEMENTS
+  // =========================================================
+
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] =
+    useState(false);
+  const [announcementsError, setAnnouncementsError] =
+    useState("");
+
+  const [showAnnouncementForm, setShowAnnouncementForm] =
+    useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] =
+    useState(null);
+
+  const [announcementTitle, setAnnouncementTitle] =
+    useState("");
+  const [announcementMessage, setAnnouncementMessage] =
+    useState("");
+  const [announcementSaving, setAnnouncementSaving] =
+    useState(false);
+
+  // =========================================================
+  // RECENT RESOURCES
   // =========================================================
 
   const [recentResources, setRecentResources] = useState([]);
@@ -33,7 +54,7 @@ function AdminDashboard({ user, onLogout }) {
   const [recentError, setRecentError] = useState("");
 
   // =========================================================
-  // DASHBOARD STATISTICS STATE
+  // DASHBOARD STATISTICS
   // =========================================================
 
   const [dashboardStats, setDashboardStats] = useState({
@@ -50,7 +71,7 @@ function AdminDashboard({ user, onLogout }) {
   const [statsError, setStatsError] = useState("");
 
   // =========================================================
-  // MANAGE USERS STATE
+  // MANAGE USERS
   // =========================================================
 
   const [users, setUsers] = useState([]);
@@ -58,13 +79,60 @@ function AdminDashboard({ user, onLogout }) {
   const [usersError, setUsersError] = useState("");
 
   // =========================================================
-  // REVIEW RESOURCES STATE
+  // REVIEW RESOURCES
   // =========================================================
 
   const [reviewResources, setReviewResources] = useState([]);
-  const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [resourcesLoading, setResourcesLoading] =
+    useState(false);
   const [resourcesError, setResourcesError] = useState("");
-  const [processingResourceId, setProcessingResourceId] = useState(null);
+  const [processingResourceId, setProcessingResourceId] =
+    useState(null);
+
+  // =========================================================
+  // GET AUTH HEADERS
+  // =========================================================
+
+  const getAuthHeaders = () => {
+    const token =
+      sessionStorage.getItem("rlearnhub_token");
+
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  // =========================================================
+  // READ BACKEND ERROR
+  // =========================================================
+
+  const getErrorMessage = async (
+    response,
+    fallbackMessage
+  ) => {
+    try {
+      const text = await response.text();
+
+      if (!text) {
+        return fallbackMessage;
+      }
+
+      try {
+        const data = JSON.parse(text);
+
+        return (
+          data.message ||
+          data.error ||
+          data.details ||
+          text
+        );
+      } catch {
+        return text;
+      }
+    } catch {
+      return fallbackMessage;
+    }
+  };
 
   // =========================================================
   // LOAD DASHBOARD STATISTICS
@@ -78,29 +146,28 @@ function AdminDashboard({ user, onLogout }) {
       setStatsError("");
 
       try {
-        const token = sessionStorage.getItem("rlearnhub_token");
+        const headers = getAuthHeaders();
 
-        const headers = {
-          Authorization: `Bearer ${token}`,
-        };
+        const [
+          usersResponse,
+          resourcesResponse,
+          pendingResponse,
+        ] = await Promise.all([
+          fetch(`${BACKEND_API}/api/admin/users`, {
+            method: "GET",
+            headers,
+          }),
 
-        const [usersResponse, resourcesResponse, pendingResponse] =
-          await Promise.all([
-            fetch("http://localhost:8080/api/admin/users", {
-              method: "GET",
-              headers,
-            }),
+          fetch(`${BACKEND_API}/api/resources`, {
+            method: "GET",
+            headers,
+          }),
 
-            fetch("http://localhost:8080/api/resources", {
-              method: "GET",
-              headers,
-            }),
-
-            fetch("http://localhost:8080/api/resources/review", {
-              method: "GET",
-              headers,
-            }),
-          ]);
+          fetch(`${BACKEND_API}/api/resources/review`, {
+            method: "GET",
+            headers,
+          }),
+        ]);
 
         const responses = [
           usersResponse,
@@ -108,54 +175,83 @@ function AdminDashboard({ user, onLogout }) {
           pendingResponse,
         ];
 
-        if (responses.some((response) => response.status === 401)) {
+        if (
+          responses.some(
+            (response) => response.status === 401
+          )
+        ) {
           throw new Error(
             "Your login session is invalid or has expired."
           );
         }
 
-        if (responses.some((response) => response.status === 403)) {
+        if (
+          responses.some(
+            (response) => response.status === 403
+          )
+        ) {
           throw new Error(
             "You do not have administrator permission."
           );
         }
 
-        if (responses.some((response) => !response.ok)) {
+        if (
+          responses.some(
+            (response) => !response.ok
+          )
+        ) {
           throw new Error(
             "Failed to load dashboard statistics."
           );
         }
 
         const usersData = await usersResponse.json();
-        const resourcesData = await resourcesResponse.json();
-        const pendingData = await pendingResponse.json();
+        const resourcesData =
+          await resourcesResponse.json();
+        const pendingData =
+          await pendingResponse.json();
 
         const students = usersData.filter(
-          (account) => account.role?.toUpperCase() === "STUDENT"
+          (account) =>
+            account.role?.toUpperCase() === "STUDENT"
         ).length;
 
         const teachers = usersData.filter(
-          (account) => account.role?.toUpperCase() === "TEACHER"
+          (account) =>
+            account.role?.toUpperCase() === "TEACHER"
         ).length;
 
         const admins = usersData.filter(
-          (account) => account.role?.toUpperCase() === "ADMIN"
+          (account) =>
+            account.role?.toUpperCase() === "ADMIN"
         ).length;
 
         setDashboardStats({
           totalUsers: usersData.length,
-          totalResources: resourcesData.length + pendingData.length,
-          approvedResources: resourcesData.length,
-          pendingResources: pendingData.length,
+
+          totalResources:
+            resourcesData.length +
+            pendingData.length,
+
+          approvedResources:
+            resourcesData.length,
+
+          pendingResources:
+            pendingData.length,
+
           students,
           teachers,
           admins,
         });
       } catch (error) {
-        console.error("Error loading dashboard statistics:", error);
+        console.error(
+          "Error loading dashboard statistics:",
+          error
+        );
 
         setStatsError(
-          error.message || "Unable to load dashboard statistics."
+          error.message ||
+            "Unable to load dashboard statistics."
         );
       } finally {
         setStatsLoading(false);
@@ -166,7 +262,7 @@ function AdminDashboard({ user, onLogout }) {
   }, [activePage]);
 
   // =========================================================
-  // LOAD RECENT APPROVED RESOURCES
+  // LOAD RECENT RESOURCES
   // =========================================================
 
   useEffect(() => {
@@ -177,15 +273,11 @@ function AdminDashboard({ user, onLogout }) {
       setRecentError("");
 
       try {
-        const token = sessionStorage.getItem("rlearnhub_token");
-
         const response = await fetch(
-          "http://localhost:8080/api/resources/recent",
+          `${BACKEND_API}/api/resources/recent`,
           {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: getAuthHeaders(),
           }
         );
 
@@ -202,16 +294,23 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         if (!response.ok) {
-          throw new Error("Failed to load recent resources.");
+          throw new Error(
+            "Failed to load recent resources."
+          );
         }
 
         const data = await response.json();
+
         setRecentResources(data);
       } catch (error) {
-        console.error("Error loading recent resources:", error);
+        console.error(
+          "Error loading recent resources:",
+          error
+        );
 
         setRecentError(
-          error.message || "Unable to load recent resources."
+          error.message ||
+            "Unable to load recent resources."
         );
       } finally {
         setRecentLoading(false);
@@ -233,15 +332,11 @@ function AdminDashboard({ user, onLogout }) {
       setUsersError("");
 
       try {
-        const token = sessionStorage.getItem("rlearnhub_token");
-
         const response = await fetch(
-          "http://localhost:8080/api/admin/users",
+          `${BACKEND_API}/api/admin/users`,
           {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: getAuthHeaders(),
           }
         );
 
@@ -262,11 +357,18 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         const data = await response.json();
+
         setUsers(data);
       } catch (error) {
-        console.error("Error loading users:", error);
+        console.error(
+          "Error loading users:",
+          error
+        );
 
-        setUsersError(error.message || "Unable to load users.");
+        setUsersError(
+          error.message ||
+            "Unable to load users."
+        );
       } finally {
         setUsersLoading(false);
       }
@@ -276,26 +378,27 @@ function AdminDashboard({ user, onLogout }) {
   }, [activePage]);
 
   // =========================================================
-  // LOAD PENDING RESOURCES
+  // LOAD REVIEW RESOURCES
   // =========================================================
 
   useEffect(() => {
-    if (activePage !== "Review Resources") return;
+    if (
+      activePage !== "Dashboard" &&
+      activePage !== "Review Resources"
+    ) {
+      return;
+    }
 
     const fetchReviewResources = async () => {
       setResourcesLoading(true);
       setResourcesError("");
 
       try {
-        const token = sessionStorage.getItem("rlearnhub_token");
-
         const response = await fetch(
-          "http://localhost:8080/api/resources/review",
+          `${BACKEND_API}/api/resources/review`,
           {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: getAuthHeaders(),
           }
         );
 
@@ -318,12 +421,17 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         const data = await response.json();
+
         setReviewResources(data);
       } catch (error) {
-        console.error("Error loading review resources:", error);
+        console.error(
+          "Error loading review resources:",
+          error
+        );
 
         setResourcesError(
-          error.message || "Unable to load resources."
+          error.message ||
+            "Unable to load review resources."
         );
       } finally {
         setResourcesLoading(false);
@@ -334,23 +442,84 @@ function AdminDashboard({ user, onLogout }) {
   }, [activePage]);
 
   // =========================================================
+  // LOAD ANNOUNCEMENTS
+  // =========================================================
+
+  useEffect(() => {
+    if (
+      activePage !== "Dashboard" &&
+      activePage !== "Announcements"
+    ) {
+      return;
+    }
+
+    const fetchAnnouncements = async () => {
+      setAnnouncementsLoading(true);
+      setAnnouncementsError("");
+
+      try {
+        const response = await fetch(
+          ANNOUNCEMENT_API,
+          {
+            method: "GET",
+            headers: getAuthHeaders(),
+          }
+        );
+
+        if (!response.ok) {
+          const errorMessage =
+            await getErrorMessage(
+              response,
+              "Failed to load announcements."
+            );
+
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+
+        const sortedAnnouncements = [...data].sort(
+          (a, b) =>
+            Number(b.id) - Number(a.id)
+        );
+
+        setAnnouncements(
+          sortedAnnouncements
+        );
+      } catch (error) {
+        console.error(
+          "Error loading announcements:",
+          error
+        );
+
+        setAnnouncementsError(
+          error.message ||
+            "Unable to load announcements."
+        );
+      } finally {
+        setAnnouncementsLoading(false);
+      }
+    };
+
+    fetchAnnouncements();
+  }, [activePage]);
+
+  // =========================================================
   // APPROVE RESOURCE
   // =========================================================
 
-  const handleApproveResource = async (resourceId) => {
+  const handleApproveResource = async (
+    resourceId
+  ) => {
     setProcessingResourceId(resourceId);
     setResourcesError("");
 
     try {
-      const token = sessionStorage.getItem("rlearnhub_token");
-
       const response = await fetch(
-        `http://localhost:8080/api/resources/${resourceId}/approve`,
+        `${BACKEND_API}/api/resources/${resourceId}/approve`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
         }
       );
 
@@ -367,32 +536,45 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to approve resource.");
+        const errorMessage =
+          await getErrorMessage(
+            response,
+            "Failed to approve resource."
+          );
+
+        throw new Error(errorMessage);
       }
 
-      setReviewResources((currentResources) =>
-        currentResources.filter(
-          (resource) => resource.id !== resourceId
-        )
+      setReviewResources(
+        (currentResources) =>
+          currentResources.filter(
+            (resource) =>
+              resource.id !== resourceId
+          )
       );
 
-      // Update the pending count immediately.
       setDashboardStats((current) => ({
         ...current,
+
         pendingResources: Math.max(
           0,
           current.pendingResources - 1
         ),
-        approvedResources: current.approvedResources + 1,
+
+        approvedResources:
+          current.approvedResources + 1,
       }));
 
-      // Reload recent resources to include the newly approved item.
       setActivePage("Dashboard");
     } catch (error) {
-      console.error("Error approving resource:", error);
+      console.error(
+        "Error approving resource:",
+        error
+      );
 
       setResourcesError(
-        error.message || "Unable to approve resource."
+        error.message ||
+          "Unable to approve resource."
       );
     } finally {
       setProcessingResourceId(null);
@@ -403,20 +585,18 @@ function AdminDashboard({ user, onLogout }) {
   // REJECT RESOURCE
   // =========================================================
 
-  const handleRejectResource = async (resourceId) => {
+  const handleRejectResource = async (
+    resourceId
+  ) => {
     setProcessingResourceId(resourceId);
     setResourcesError("");
 
     try {
-      const token = sessionStorage.getItem("rlearnhub_token");
-
       const response = await fetch(
-        `http://localhost:8080/api/resources/${resourceId}/reject`,
+        `${BACKEND_API}/api/resources/${resourceId}/reject`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
         }
       );
 
@@ -433,21 +613,31 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to reject resource.");
+        const errorMessage =
+          await getErrorMessage(
+            response,
+            "Failed to reject resource."
+          );
+
+        throw new Error(errorMessage);
       }
 
-      setReviewResources((currentResources) =>
-        currentResources.filter(
-          (resource) => resource.id !== resourceId
-        )
+      setReviewResources(
+        (currentResources) =>
+          currentResources.filter(
+            (resource) =>
+              resource.id !== resourceId
+          )
       );
 
       setDashboardStats((current) => ({
         ...current,
+
         pendingResources: Math.max(
           0,
           current.pendingResources - 1
         ),
+
         totalResources: Math.max(
           0,
           current.totalResources - 1
@@ -456,14 +646,345 @@ function AdminDashboard({ user, onLogout }) {
 
       setActivePage("Dashboard");
     } catch (error) {
-      console.error("Error rejecting resource:", error);
+      console.error(
+        "Error rejecting resource:",
+        error
+      );
 
       setResourcesError(
-        error.message || "Unable to reject resource."
+        error.message ||
+          "Unable to reject resource."
       );
     } finally {
       setProcessingResourceId(null);
     }
+  };
+
+  // =========================================================
+  // ANNOUNCEMENT FORM
+  // =========================================================
+
+  const handleOpenAnnouncementForm = () => {
+    setEditingAnnouncementId(null);
+    setAnnouncementTitle("");
+    setAnnouncementMessage("");
+    setAnnouncementsError("");
+    setShowAnnouncementForm(true);
+  };
+
+  const handleEditAnnouncement = (
+    announcement
+  ) => {
+    setEditingAnnouncementId(
+      announcement.id
+    );
+
+    setAnnouncementTitle(
+      announcement.title || ""
+    );
+
+    setAnnouncementMessage(
+      announcement.message || ""
+    );
+
+    setAnnouncementsError("");
+    setShowAnnouncementForm(true);
+  };
+
+  const handleCancelAnnouncement = () => {
+    setShowAnnouncementForm(false);
+    setEditingAnnouncementId(null);
+    setAnnouncementTitle("");
+    setAnnouncementMessage("");
+    setAnnouncementSaving(false);
+  };
+
+  // =========================================================
+  // SAVE ANNOUNCEMENT
+  // =========================================================
+
+  const handleSaveAnnouncement = async (
+    event
+  ) => {
+    event.preventDefault();
+
+    const title = announcementTitle.trim();
+    const message = announcementMessage.trim();
+
+    if (!title || !message) {
+      alert(
+        "Please enter both a title and a message."
+      );
+
+      return;
+    }
+
+    // The backend identifies the author by the actual
+    // logged-in user's name.
+    const actualAuthor =
+      user?.name?.toString().trim();
+
+    if (!actualAuthor) {
+      setAnnouncementsError(
+        "Your account name could not be found. Please log out and log in again."
+      );
+
+      return;
+    }
+
+    setAnnouncementsError("");
+    setAnnouncementSaving(true);
+
+    try {
+      const today = new Date();
+
+      const formattedDate =
+        today.toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        });
+
+      // IMPORTANT:
+      // The backend Announcement entity/controller uses
+      // datePosted, NOT date.
+      const announcementData = {
+        title: title,
+        message: message,
+        datePosted: formattedDate,
+        author: actualAuthor,
+      };
+
+      console.log(
+        "Sending announcement:",
+        announcementData
+      );
+
+      // =====================================================
+      // UPDATE EXISTING ANNOUNCEMENT
+      // =====================================================
+
+      if (editingAnnouncementId !== null) {
+        const response = await fetch(
+          `${ANNOUNCEMENT_API}/${editingAnnouncementId}`,
+          {
+            method: "PUT",
+            headers: {
+              ...getAuthHeaders(),
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify(
+              announcementData
+            ),
+          }
+        );
+
+        if (!response.ok) {
+          const errorMessage =
+            await getErrorMessage(
+              response,
+              "Failed to update announcement."
+            );
+
+          throw new Error(errorMessage);
+        }
+
+        const updatedAnnouncement =
+          await response.json();
+
+        setAnnouncements(
+          (currentAnnouncements) =>
+            currentAnnouncements
+              .map((announcement) =>
+                Number(announcement.id) ===
+                Number(editingAnnouncementId)
+                  ? updatedAnnouncement
+                  : announcement
+              )
+              .sort(
+                (a, b) =>
+                  Number(b.id) -
+                  Number(a.id)
+              )
+        );
+
+        handleCancelAnnouncement();
+
+        return;
+      }
+
+      // =====================================================
+      // CREATE NEW ANNOUNCEMENT
+      // =====================================================
+
+      const response = await fetch(
+        ANNOUNCEMENT_API,
+        {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify(
+            announcementData
+          ),
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage =
+          await getErrorMessage(
+            response,
+            "Failed to create announcement."
+          );
+
+        console.error(
+          "Announcement creation failed:",
+          response.status,
+          errorMessage
+        );
+
+        throw new Error(errorMessage);
+      }
+
+      const newAnnouncement =
+        await response.json();
+
+      console.log(
+        "Announcement successfully created:",
+        newAnnouncement
+      );
+
+      setAnnouncements(
+        (currentAnnouncements) =>
+          [
+            newAnnouncement,
+            ...currentAnnouncements,
+          ].sort(
+            (a, b) =>
+              Number(b.id) -
+              Number(a.id)
+          )
+      );
+
+      handleCancelAnnouncement();
+    } catch (error) {
+      console.error(
+        "Error saving announcement:",
+        error
+      );
+
+      setAnnouncementsError(
+        error.message ||
+          "Unable to save announcement."
+      );
+
+      setAnnouncementSaving(false);
+    }
+  };
+
+  // =========================================================
+  // DELETE ANNOUNCEMENT
+  // =========================================================
+
+  const handleDeleteAnnouncement = async (
+    announcementId
+  ) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this announcement?"
+    );
+
+    if (!confirmed) return;
+
+    setAnnouncementsError("");
+
+    try {
+      const response = await fetch(
+        `${ANNOUNCEMENT_API}/${announcementId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage =
+          await getErrorMessage(
+            response,
+            "Failed to delete announcement."
+          );
+
+        throw new Error(errorMessage);
+      }
+
+      setAnnouncements(
+        (currentAnnouncements) =>
+          currentAnnouncements.filter(
+            (announcement) =>
+              Number(announcement.id) !==
+              Number(announcementId)
+          )
+      );
+    } catch (error) {
+      console.error(
+        "Error deleting announcement:",
+        error
+      );
+
+      setAnnouncementsError(
+        error.message ||
+          "Unable to delete announcement."
+      );
+    }
+  };
+
+  // =========================================================
+  // ANNOUNCEMENT AUTHOR
+  // =========================================================
+
+  const getAnnouncementAuthor = (
+    announcement
+  ) => {
+    const author =
+      announcement?.author
+        ?.toString()
+        .trim();
+
+    if (!author) {
+      return "Posted by Administrator";
+    }
+
+    const normalized =
+      author.toUpperCase();
+
+    if (
+      normalized === "ADMIN" ||
+      normalized === "ADMINISTRATOR"
+    ) {
+      return "Posted by Administrator";
+    }
+
+    if (normalized === "TEACHER") {
+      return "Posted by Teacher";
+    }
+
+    return `Posted by ${author}`;
+  };
+
+  // =========================================================
+  // ANNOUNCEMENT DATE
+  // =========================================================
+
+  const getAnnouncementDate = (
+    announcement
+  ) => {
+    return (
+      announcement?.datePosted ||
+      announcement?.date ||
+      "Date unavailable"
+    );
   };
 
   // =========================================================
@@ -494,14 +1015,17 @@ function AdminDashboard({ user, onLogout }) {
             <div className="admin-panel-header">
               <div>
                 <h3>Manage Users</h3>
+
                 <p>
-                  Manage student, teacher, and administrator
-                  accounts.
+                  Manage student, teacher,
+                  and administrator accounts.
                 </p>
               </div>
             </div>
 
-            {usersLoading && <p>Loading users...</p>}
+            {usersLoading && (
+              <p>Loading users...</p>
+            )}
 
             {usersError && (
               <div className="admin-error-message">
@@ -511,7 +1035,9 @@ function AdminDashboard({ user, onLogout }) {
 
             {!usersLoading &&
               !usersError &&
-              users.length === 0 && <p>No users found.</p>}
+              users.length === 0 && (
+                <p>No users found.</p>
+              )}
 
             {!usersLoading &&
               !usersError &&
@@ -531,14 +1057,22 @@ function AdminDashboard({ user, onLogout }) {
                       {users.map((account) => (
                         <tr key={account.id}>
                           <td>{account.id}</td>
+
                           <td>
-                            <strong>{account.name}</strong>
+                            <strong>
+                              {account.name}
+                            </strong>
                           </td>
-                          <td>{account.email}</td>
+
+                          <td>
+                            {account.email}
+                          </td>
+
                           <td>
                             <span
                               className={`admin-role-badge ${
-                                account.role?.toLowerCase()
+                                account.role?.toLowerCase() ||
+                                ""
                               }`}
                             >
                               {account.role}
@@ -563,14 +1097,18 @@ function AdminDashboard({ user, onLogout }) {
             <div className="admin-panel-header">
               <div>
                 <h3>Review Resources</h3>
+
                 <p>
-                  Review learning materials uploaded by
-                  teachers before they become available.
+                  Review learning materials
+                  uploaded by teachers before
+                  they become available.
                 </p>
               </div>
             </div>
 
-            {resourcesLoading && <p>Loading resources...</p>}
+            {resourcesLoading && (
+              <p>Loading resources...</p>
+            )}
 
             {resourcesError && (
               <div className="admin-error-message">
@@ -582,85 +1120,108 @@ function AdminDashboard({ user, onLogout }) {
               !resourcesError &&
               reviewResources.length === 0 && (
                 <div className="admin-empty-message">
-                  <strong>No Pending Resources</strong>
+                  <strong>
+                    No Pending Resources
+                  </strong>
+
                   <p>
-                    There are currently no resources
-                    waiting for administrator review.
+                    There are currently no
+                    resources waiting for
+                    administrator review.
                   </p>
                 </div>
               )}
 
             {!resourcesLoading &&
+              !resourcesError &&
               reviewResources.length > 0 && (
                 <div className="admin-resource-list">
-                  {reviewResources.map((resource) => (
-                    <div
-                      className="admin-resource-row"
-                      key={resource.id}
-                    >
-                      <div className="admin-resource-file">
-                        <span>{resource.type}</span>
-                      </div>
+                  {reviewResources.map(
+                    (resource) => (
+                      <div
+                        className="admin-resource-row admin-review-resource-row"
+                        key={resource.id}
+                      >
+                        <div className="admin-resource-file">
+                          <span>
+                            {resource.type}
+                          </span>
+                        </div>
 
-                      <div className="admin-resource-information">
-                        <strong>{resource.title}</strong>
+                        <div className="admin-resource-information">
+                          <strong>
+                            {resource.title}
+                          </strong>
 
-                        <span>
-                          {resource.subject}
-                          {" • "}
-                          {resource.topic}
+                          <span>
+                            {resource.subject}
+                            {" • "}
+                            {resource.topic}
+                          </span>
+
+                          <span>
+                            Year Level:{" "}
+                            {resource.yearLevel}
+                            {" • "}
+                            Uploaded by{" "}
+                            {resource.author}
+                          </span>
+
+                          <span>
+                            Date Added:{" "}
+                            {resource.dateAdded}
+                            {" • "}
+                            Size:{" "}
+                            {resource.size}
+                          </span>
+                        </div>
+
+                        <span className="admin-status-badge pending">
+                          PENDING
                         </span>
 
-                        <span>
-                          Year Level: {resource.yearLevel}
-                          {" • "}
-                          Uploaded by {resource.author}
-                        </span>
+                        <div className="admin-resource-actions">
+                          <button
+                            type="button"
+                            className="admin-approve-button"
+                            disabled={
+                              processingResourceId ===
+                              resource.id
+                            }
+                            onClick={() =>
+                              handleApproveResource(
+                                resource.id
+                              )
+                            }
+                          >
+                            {processingResourceId ===
+                            resource.id
+                              ? "Processing..."
+                              : "Approve"}
+                          </button>
 
-                        <span>
-                          Date Added: {resource.dateAdded}
-                          {" • "}
-                          Size: {resource.size}
-                        </span>
+                          <button
+                            type="button"
+                            className="admin-reject-button"
+                            disabled={
+                              processingResourceId ===
+                              resource.id
+                            }
+                            onClick={() =>
+                              handleRejectResource(
+                                resource.id
+                              )
+                            }
+                          >
+                            {processingResourceId ===
+                            resource.id
+                              ? "Processing..."
+                              : "Reject"}
+                          </button>
+                        </div>
                       </div>
-
-                      <span className="admin-status-badge pending">
-                        PENDING
-                      </span>
-
-                      <div className="admin-resource-actions">
-                        <button
-                          type="button"
-                          className="admin-approve-button"
-                          disabled={
-                            processingResourceId === resource.id
-                          }
-                          onClick={() =>
-                            handleApproveResource(resource.id)
-                          }
-                        >
-                          {processingResourceId === resource.id
-                            ? "Processing..."
-                            : "Approve"}
-                        </button>
-
-                        <button
-                          type="button"
-                          className="admin-reject-button"
-                          disabled={
-                            processingResourceId === resource.id
-                          }
-                          onClick={() =>
-                            handleRejectResource(resource.id)
-                          }
-                        >
-                          {processingResourceId === resource.id
-                            ? "Processing..."
-                            : "Reject"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               )}
           </section>
@@ -670,25 +1231,200 @@ function AdminDashboard({ user, onLogout }) {
       // REPORTS
       // =====================================================
 
-      case "Reports":
+      case "Reports": {
+        const approvalRate =
+          dashboardStats.totalResources > 0
+            ? Math.round(
+                (dashboardStats.approvedResources /
+                  dashboardStats.totalResources) *
+                  100
+              )
+            : 0;
+
         return (
           <section className="admin-panel">
             <div className="admin-panel-header">
               <div>
                 <h3>System Reports</h3>
+
                 <p>
-                  View resource, user, and download
-                  statistics.
+                  View user, resource,
+                  and system statistics.
                 </p>
               </div>
             </div>
 
-            <p>
-              Reports and analytics will be connected
-              to the backend database.
-            </p>
+            {statsLoading ? (
+              <div className="admin-report-loading">
+                Loading reports...
+              </div>
+            ) : statsError ? (
+              <div className="admin-error-message">
+                {statsError}
+              </div>
+            ) : (
+              <>
+                <div className="admin-report-section">
+                  <div className="admin-report-section-header">
+                    <div>
+                      <h4>User Report</h4>
+
+                      <p>
+                        Overview of registered
+                        RLearn Hub users.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="admin-report-grid">
+                    <div className="admin-report-card">
+                      <span>
+                        Total Users
+                      </span>
+
+                      <strong>
+                        {
+                          dashboardStats.totalUsers
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>Students</span>
+
+                      <strong>
+                        {
+                          dashboardStats.students
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>Teachers</span>
+
+                      <strong>
+                        {
+                          dashboardStats.teachers
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>
+                        Administrators
+                      </span>
+
+                      <strong>
+                        {
+                          dashboardStats.admins
+                        }
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-report-section">
+                  <div className="admin-report-section-header">
+                    <div>
+                      <h4>
+                        Resource Report
+                      </h4>
+
+                      <p>
+                        Overview of learning
+                        resources in the system.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="admin-report-grid">
+                    <div className="admin-report-card">
+                      <span>
+                        Total Resources
+                      </span>
+
+                      <strong>
+                        {
+                          dashboardStats.totalResources
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>
+                        Approved Resources
+                      </span>
+
+                      <strong>
+                        {
+                          dashboardStats.approvedResources
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>
+                        Pending Resources
+                      </span>
+
+                      <strong>
+                        {
+                          dashboardStats.pendingResources
+                        }
+                      </strong>
+                    </div>
+
+                    <div className="admin-report-card">
+                      <span>
+                        Approval Rate
+                      </span>
+
+                      <strong>
+                        {approvalRate}%
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-report-summary">
+                  <div>
+                    <span>System Summary</span>
+
+                    <p>
+                      RLearn Hub currently has{" "}
+                      <strong>
+                        {
+                          dashboardStats.totalUsers
+                        }
+                      </strong>{" "}
+                      registered users and{" "}
+                      <strong>
+                        {
+                          dashboardStats.totalResources
+                        }
+                      </strong>{" "}
+                      resources.
+                    </p>
+                  </div>
+
+                  <div className="admin-report-summary-status">
+                    <strong>
+                      {
+                        dashboardStats.pendingResources
+                      }
+                    </strong>
+
+                    <span>
+                      Resources waiting
+                      for review
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
         );
+      }
 
       // =====================================================
       // ANNOUNCEMENTS
@@ -700,30 +1436,228 @@ function AdminDashboard({ user, onLogout }) {
             <div className="admin-panel-header">
               <div>
                 <h3>Announcements</h3>
+
                 <p>
-                  View announcements for RLearn Hub.
+                  Create and manage
+                  announcements for
+                  RLearn Hub users.
                 </p>
               </div>
+
+              <button
+                type="button"
+                className="admin-create-button"
+                onClick={
+                  handleOpenAnnouncementForm
+                }
+              >
+                + Create Announcement
+              </button>
             </div>
 
-            <div className="admin-announcement-list">
-              {announcements.map((announcement) => (
-                <div
-                  className="admin-announcement-item"
-                  key={announcement.id}
-                >
-                  <div className="admin-announcement-icon">
-                    A
-                  </div>
+            {announcementsLoading && (
+              <p>
+                Loading announcements...
+              </p>
+            )}
 
-                  <div className="admin-announcement-content">
-                    <strong>{announcement.title}</strong>
-                    <p>{announcement.message}</p>
-                    <span>{announcement.date}</span>
+            {announcementsError && (
+              <div className="admin-error-message">
+                {announcementsError}
+              </div>
+            )}
+
+            {showAnnouncementForm && (
+              <form
+                className="admin-announcement-form"
+                onSubmit={
+                  handleSaveAnnouncement
+                }
+              >
+                <div className="admin-announcement-form-header">
+                  <div>
+                    <h4>
+                      {editingAnnouncementId !==
+                      null
+                        ? "Edit Announcement"
+                        : "Create Announcement"}
+                    </h4>
+
+                    <p>
+                      {editingAnnouncementId !==
+                      null
+                        ? "Update the announcement details."
+                        : "Create a new announcement for RLearn Hub users."}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="announcementTitle">
+                    Title
+                  </label>
+
+                  <input
+                    id="announcementTitle"
+                    type="text"
+                    value={
+                      announcementTitle
+                    }
+                    onChange={(event) =>
+                      setAnnouncementTitle(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter announcement title"
+                    disabled={
+                      announcementSaving
+                    }
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="announcementMessage">
+                    Message
+                  </label>
+
+                  <textarea
+                    id="announcementMessage"
+                    value={
+                      announcementMessage
+                    }
+                    onChange={(event) =>
+                      setAnnouncementMessage(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter announcement message"
+                    rows="5"
+                    disabled={
+                      announcementSaving
+                    }
+                  />
+                </div>
+
+                <div className="admin-announcement-form-actions">
+                  <button
+                    type="button"
+                    className="admin-cancel-button"
+                    onClick={
+                      handleCancelAnnouncement
+                    }
+                    disabled={
+                      announcementSaving
+                    }
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="admin-save-button"
+                    disabled={
+                      announcementSaving
+                    }
+                  >
+                    {announcementSaving
+                      ? "Saving..."
+                      : editingAnnouncementId !==
+                        null
+                      ? "Save Changes"
+                      : "Publish Announcement"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {!announcementsLoading &&
+              !announcementsError &&
+              !showAnnouncementForm &&
+              announcements.length === 0 && (
+                <div className="admin-empty-message">
+                  <strong>
+                    No Announcements
+                  </strong>
+
+                  <p>
+                    There are currently
+                    no announcements.
+                  </p>
+                </div>
+              )}
+
+            {!announcementsLoading &&
+              !announcementsError &&
+              announcements.length > 0 && (
+                <div className="admin-announcement-list">
+                  {announcements.map(
+                    (announcement) => (
+                      <div
+                        className="admin-announcement-item admin-announcement-managed"
+                        key={announcement.id}
+                      >
+                        <div className="admin-announcement-icon">
+                          A
+                        </div>
+
+                        <div className="admin-announcement-content">
+                          <strong>
+                            {
+                              announcement.title
+                            }
+                          </strong>
+
+                          <p>
+                            {
+                              announcement.message
+                            }
+                          </p>
+
+                          <span className="admin-announcement-date">
+                            {getAnnouncementDate(
+                              announcement
+                            )}
+                          </span>
+
+                          <small className="admin-announcement-author">
+                            {
+                              getAnnouncementAuthor(
+                                announcement
+                              )
+                            }
+                          </small>
+                        </div>
+
+                        <div className="admin-announcement-actions">
+                          <button
+                            type="button"
+                            className="admin-edit-button"
+                            onClick={() =>
+                              handleEditAnnouncement(
+                                announcement
+                              )
+                            }
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            className="admin-delete-button"
+                            onClick={() =>
+                              handleDeleteAnnouncement(
+                                announcement.id
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
           </section>
         );
 
@@ -738,46 +1672,56 @@ function AdminDashboard({ user, onLogout }) {
 
   return (
     <div className="admin-layout">
-      {/* SIDEBAR */}
+      {/* =====================================================
+          SIDEBAR
+          ===================================================== */}
+
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <div className="admin-logo">R</div>
 
           <div className="admin-brand-text">
             <h1>RLearn Hub</h1>
-            <p>Learning Resource System</p>
+
+            <p>
+              Learning Resource System
+            </p>
           </div>
         </div>
 
-        {/* ADMIN PROFILE */}
         <div className="admin-user">
           <div className="admin-user-avatar">
-            {adminName.charAt(0).toUpperCase()}
+            {adminName
+              .charAt(0)
+              .toUpperCase()}
           </div>
 
           <div className="admin-user-details">
             <strong>{adminName}</strong>
+
             <span>Administrator</span>
           </div>
         </div>
 
-        {/* NAVIGATION */}
         <nav className="admin-navigation">
           {navigationItems.map((item) => (
             <button
               key={item}
               type="button"
               className={`admin-nav-item ${
-                activePage === item ? "active" : ""
+                activePage === item
+                  ? "active"
+                  : ""
               }`}
-              onClick={() => setActivePage(item)}
+              onClick={() =>
+                setActivePage(item)
+              }
             >
               {item}
             </button>
           ))}
         </nav>
 
-        {/* LOGOUT */}
         <button
           type="button"
           className="admin-logout"
@@ -787,11 +1731,17 @@ function AdminDashboard({ user, onLogout }) {
         </button>
       </aside>
 
-      {/* MAIN CONTENT */}
+      {/* =====================================================
+          MAIN CONTENT
+          ===================================================== */}
+
       <main className="admin-main">
         {activePage === "Dashboard" ? (
           <>
-            {/* WELCOME HEADER */}
+            {/* =================================================
+                WELCOME
+                ================================================= */}
+
             <section className="admin-welcome">
               <div>
                 <span className="admin-label">
@@ -801,8 +1751,9 @@ function AdminDashboard({ user, onLogout }) {
                 <h2>Admin Dashboard</h2>
 
                 <p>
-                  Manage RLearn-Hub users, resources,
-                  announcements, and system activities.
+                  Manage RLearn-Hub users,
+                  resources, announcements,
+                  and system activities.
                 </p>
               </div>
 
@@ -812,27 +1763,24 @@ function AdminDashboard({ user, onLogout }) {
               </div>
             </section>
 
-            {/* STATISTICS */}
+            {/* =================================================
+                STATISTICS
+                ================================================= */}
+
             <section className="admin-statistics">
               <div className="admin-stat-card">
-                <div className="admin-stat-top">
-                
-                </div>
-
                 <strong>
                   {statsLoading
                     ? "..."
                     : dashboardStats.totalResources}
                 </strong>
 
-                <span>Total Resources</span>
+                <span>
+                  Total Resources
+                </span>
               </div>
 
               <div className="admin-stat-card">
-                <div className="admin-stat-top">
-                
-                </div>
-
                 <strong>
                   {statsLoading
                     ? "..."
@@ -843,31 +1791,27 @@ function AdminDashboard({ user, onLogout }) {
               </div>
 
               <div className="admin-stat-card">
-                <div className="admin-stat-top">
-                
-                </div>
-
                 <strong>
                   {statsLoading
                     ? "..."
                     : dashboardStats.approvedResources}
                 </strong>
 
-                <span>Approved Resources</span>
+                <span>
+                  Approved Resources
+                </span>
               </div>
 
               <div className="admin-stat-card">
-                <div className="admin-stat-top">
-                
-                </div>
-
                 <strong>
                   {statsLoading
                     ? "..."
                     : dashboardStats.pendingResources}
                 </strong>
 
-                <span>Pending Approvals</span>
+                <span>
+                  Pending Approvals
+                </span>
               </div>
             </section>
 
@@ -877,155 +1821,367 @@ function AdminDashboard({ user, onLogout }) {
               </div>
             )}
 
-            {/* DASHBOARD CONTENT */}
-            <div className="admin-content-grid">
-              {/* RECENT RESOURCES */}
-              <section className="admin-panel">
-                <div className="admin-panel-header">
-                  <div>
-                    <h3>Recent Resources</h3>
-                    <p>
-                      Recently uploaded learning materials
-                    </p>
-                  </div>
+            {/* =================================================
+                RECENT RESOURCES
+                ================================================= */}
 
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <h3>
+                    Recent Resources
+                  </h3>
+
+                  <p>
+                    Recently uploaded
+                    learning materials
+                  </p>
+                </div>
+
+                {recentResources.length > 3 && (
                   <button
                     type="button"
                     className="admin-panel-action"
                     onClick={() =>
-                      setActivePage("Review Resources")
+                      setShowAllRecentResources(
+                        (current) => !current
+                      )
                     }
                   >
-                    View All →
+                    {showAllRecentResources
+                      ? "Show Less ↑"
+                      : "View All →"}
                   </button>
-                </div>
+                )}
+              </div>
 
-                <div className="admin-resource-list">
-                  {recentLoading && (
-                    <p>Loading recent resources...</p>
+              <div className="admin-resource-list">
+                {recentLoading && (
+                  <p>
+                    Loading recent
+                    resources...
+                  </p>
+                )}
+
+                {recentError && (
+                  <div className="admin-error-message">
+                    {recentError}
+                  </div>
+                )}
+
+                {!recentLoading &&
+                  !recentError &&
+                  recentResources.length ===
+                    0 && (
+                    <p>
+                      No approved
+                      resources found.
+                    </p>
                   )}
 
-                  {recentError && (
-                    <div className="admin-error-message">
-                      {recentError}
-                    </div>
-                  )}
-
-                  {!recentLoading &&
-                    !recentError &&
-                    recentResources.length === 0 && (
-                      <p>No approved resources found.</p>
-                    )}
-
-                  {!recentLoading &&
-                    !recentError &&
-                    recentResources.map((resource) => (
-                      <div
-                        className="admin-resource-row"
-                        key={resource.id}
-                      >
-                        <div className="admin-resource-file">
-                          <span>{resource.type}</span>
-                        </div>
-
-                        <div className="admin-resource-information">
-                          <strong>{resource.title}</strong>
-
-                          <span>
-                            {resource.subject}
-                            {" • "}
-                            Uploaded by{" "}
-                            {resource.author || "Unknown"}
-                          </span>
-                        </div>
-
-                        <span className="admin-status-badge approved">
-                          APPROVED
+                {!recentLoading &&
+                  !recentError &&
+                  recentResources.length > 0 &&
+                  (showAllRecentResources
+                    ? recentResources
+                    : recentResources.slice(0, 3)
+                  ).map((resource) => (
+                    <div
+                      className="admin-resource-row"
+                      key={resource.id}
+                    >
+                      <div className="admin-resource-file">
+                        <span>
+                          {resource.type}
                         </span>
                       </div>
-                    ))}
+
+                      <div className="admin-resource-information">
+                        <strong>
+                          {resource.title}
+                        </strong>
+
+                        <span>
+                          {resource.subject}
+                          {" • "}
+                          Uploaded by{" "}
+                          {resource.author ||
+                            "Unknown"}
+                        </span>
+                      </div>
+
+                      <span className="admin-status-badge approved">
+                        APPROVED
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </section>
+
+            {/* =================================================
+                ANNOUNCEMENTS
+                ================================================= */}
+
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <h3>Announcements</h3>
+
+                  <p>
+                    Latest system
+                    announcements
+                  </p>
                 </div>
-              </section>
 
-              {/* ANNOUNCEMENTS */}
-              <section className="admin-panel">
-                <div className="admin-panel-header">
-                  <div>
-                    <h3>Announcements</h3>
-                    <p>Latest system announcements</p>
-                  </div>
-
+                {announcements.length > 3 && (
                   <button
                     type="button"
                     className="admin-panel-action"
                     onClick={() =>
-                      setActivePage("Announcements")
+                      setShowAllDashboardAnnouncements(
+                        (current) => !current
+                      )
                     }
                   >
-                    View All →
+                    {showAllDashboardAnnouncements
+                      ? "Show Less ↑"
+                      : "View All →"}
                   </button>
-                </div>
+                )}
+              </div>
 
-                <div className="admin-announcement-list">
-                  {announcements.map((announcement) => (
+              <div className="admin-announcement-list">
+                {announcementsLoading && (
+                  <p>
+                    Loading announcements...
+                  </p>
+                )}
+
+                {announcementsError && (
+                  <div className="admin-error-message">
+                    {announcementsError}
+                  </div>
+                )}
+
+                {!announcementsLoading &&
+                  !announcementsError &&
+                  announcements.length ===
+                    0 && (
+                    <p>
+                      No announcements
+                      available.
+                    </p>
+                  )}
+
+                {!announcementsLoading &&
+                  !announcementsError &&
+                  announcements.length > 0 &&
+                  (showAllDashboardAnnouncements
+                    ? announcements
+                    : announcements.slice(0, 3)
+                  ).map((announcement) => (
                     <div
                       className="admin-announcement-item"
                       key={announcement.id}
                     >
-                      <div className="admin-announcement-icon"></div>
+                      <div className="admin-announcement-icon">
+                        A
+                      </div>
 
                       <div className="admin-announcement-content">
-                        <strong>{announcement.title}</strong>
-                        <p>{announcement.message}</p>
-                        <span>{announcement.date}</span>
+                        <strong>
+                          {
+                            announcement.title
+                          }
+                        </strong>
+
+                        <p>
+                          {
+                            announcement.message
+                          }
+                        </p>
+
+                        <span className="admin-announcement-date">
+                          {getAnnouncementDate(
+                            announcement
+                          )}
+                        </span>
+
+                        <small className="admin-announcement-author">
+                          {
+                            getAnnouncementAuthor(
+                              announcement
+                            )
+                          }
+                        </small>
                       </div>
                     </div>
                   ))}
-                </div>
-              </section>
-            </div>
-
-            {/* PENDING APPROVALS */}
-            <section className="admin-panel">
-              <div className="admin-panel-header">
-                <div>
-                  <h3>Resource Approvals</h3>
-                  <p>
-                    Resources waiting for administrator review
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="admin-panel-action"
-                  onClick={() =>
-                    setActivePage("Review Resources")
-                  }
-                >
-                  Review All →
-                </button>
-              </div>
-
-              <div className="admin-approval-summary">
-                <div className="admin-approval-number">
-                  {statsLoading
-                    ? "..."
-                    : dashboardStats.pendingResources}
-                </div>
-
-                <div className="admin-approval-information">
-                  <strong>Pending Resources</strong>
-
-                  <span>
-                    These resources require administrator
-                    approval before becoming available to
-                    students and teachers.
-                  </span>
-                </div>
               </div>
             </section>
 
-            {/* FOOTER */}
+            {/* =================================================
+                RESOURCE APPROVALS
+                ================================================= */}
+
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <h3>
+                    Resource Approvals
+                  </h3>
+
+                  <p>
+                    Resources waiting for
+                    administrator review
+                  </p>
+                </div>
+
+                {reviewResources.length > 3 && (
+                  <button
+                    type="button"
+                    className="admin-panel-action"
+                    onClick={() =>
+                      setShowAllDashboardApprovals(
+                        (current) => !current
+                      )
+                    }
+                  >
+                    {showAllDashboardApprovals
+                      ? "Show Less ↑"
+                      : "Review All →"}
+                  </button>
+                )}
+              </div>
+
+              {resourcesLoading && (
+                <p>
+                  Loading pending resources...
+                </p>
+              )}
+
+              {resourcesError && (
+                <div className="admin-error-message">
+                  {resourcesError}
+                </div>
+              )}
+
+              {!resourcesLoading &&
+                !resourcesError &&
+                reviewResources.length === 0 && (
+                  <div className="admin-empty-message">
+                    <strong>
+                      No Pending Resources
+                    </strong>
+
+                    <p>
+                      There are currently no
+                      resources waiting for
+                      administrator review.
+                    </p>
+                  </div>
+                )}
+
+              {!resourcesLoading &&
+                !resourcesError &&
+                reviewResources.length > 0 && (
+                  <div className="admin-resource-list">
+                    {(showAllDashboardApprovals
+                      ? reviewResources
+                      : reviewResources.slice(0, 3)
+                    ).map((resource) => (
+                      <div
+                        className="admin-resource-row admin-review-resource-row"
+                        key={resource.id}
+                      >
+                        <div className="admin-resource-file">
+                          <span>
+                            {resource.type}
+                          </span>
+                        </div>
+
+                        <div className="admin-resource-information">
+                          <strong>
+                            {resource.title}
+                          </strong>
+
+                          <span>
+                            {resource.subject}
+                            {" • "}
+                            {resource.topic}
+                          </span>
+
+                          <span>
+                            Year Level:{" "}
+                            {resource.yearLevel}
+                            {" • "}
+                            Uploaded by{" "}
+                            {resource.author ||
+                              "Unknown"}
+                          </span>
+
+                          <span>
+                            Date Added:{" "}
+                            {resource.dateAdded}
+                            {" • "}
+                            Size:{" "}
+                            {resource.size}
+                          </span>
+                        </div>
+
+                        <span className="admin-status-badge pending">
+                          PENDING
+                        </span>
+
+                        <div className="admin-resource-actions">
+                          <button
+                            type="button"
+                            className="admin-approve-button"
+                            disabled={
+                              processingResourceId ===
+                              resource.id
+                            }
+                            onClick={() =>
+                              handleApproveResource(
+                                resource.id
+                              )
+                            }
+                          >
+                            {processingResourceId ===
+                            resource.id
+                              ? "Processing..."
+                              : "Approve"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="admin-reject-button"
+                            disabled={
+                              processingResourceId ===
+                              resource.id
+                            }
+                            onClick={() =>
+                              handleRejectResource(
+                                resource.id
+                              )
+                            }
+                          >
+                            {processingResourceId ===
+                            resource.id
+                              ? "Processing..."
+                              : "Reject"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </section>
+
+            {/* =================================================
+                FOOTER
+                ================================================= */}
+
             <footer className="admin-footer">
               © 2026 RLearn Hub — Rosemont Hills
               Montessori College
@@ -1033,7 +2189,10 @@ function AdminDashboard({ user, onLogout }) {
           </>
         ) : (
           <>
-            {/* OTHER ADMIN PAGES */}
+            {/* =================================================
+                OTHER ADMIN PAGES
+                ================================================= */}
+
             <section className="admin-welcome">
               <div>
                 <span className="admin-label">
@@ -1043,7 +2202,8 @@ function AdminDashboard({ user, onLogout }) {
                 <h2>{activePage}</h2>
 
                 <p>
-                  RLearn Hub administrator control panel.
+                  RLearn Hub administrator
+                  control panel.
                 </p>
               </div>
 

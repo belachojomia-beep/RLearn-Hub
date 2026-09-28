@@ -104,20 +104,13 @@ function App() {
         JSON.stringify(data)
       );
 
-      setUser(data);
+     setUser(data);
 
-      setCurrentPage("dashboard");
-      // ======================================
-      // SET LOGGED-IN USER
-      // ======================================
+    setEmail("");
 
-      setUser(data);
+    setPassword("");
 
-      setEmail("");
-
-      setPassword("");
-
-      setCurrentPage("dashboard");
+    setCurrentPage("dashboard");
 
     } catch (error) {
 

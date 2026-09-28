@@ -8,7 +8,12 @@ import java.util.List;
 public interface NotificationRepository
         extends JpaRepository<Notification, Long> {
 
-    List<Notification> findByUserEmailOrderByIdDesc(String userEmail);
+    List<Notification> findByUserEmailIgnoreCaseOrderByIdDesc(String userEmail);
+
+List<Notification> findByUserEmailIgnoreCaseAndReadStatus(
+        String userEmail,
+        boolean readStatus
+);
 
     List<Notification> findByUserEmailAndReadStatus(
             String userEmail,
