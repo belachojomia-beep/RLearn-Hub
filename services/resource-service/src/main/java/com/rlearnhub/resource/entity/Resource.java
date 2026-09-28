@@ -40,6 +40,8 @@ public class Resource {
     @Column
     private String filePath;
 
+    @Column(nullable = false)
+    private String status = "PENDING";
     public Resource() {
     }
 
@@ -149,5 +151,12 @@ public class Resource {
 
     public void setFilePath(String filePath) {
         this.filePath = filePath;
+    }
+        public String getStatus() {
+    return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

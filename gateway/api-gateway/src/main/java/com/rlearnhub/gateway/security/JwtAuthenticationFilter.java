@@ -100,17 +100,28 @@ public class JwtAuthenticationFilter
             String method,
             String role
     ) {
+        /*
+     * Admin endpoints:
+     * ADMIN only.
+     */
+    if (path.startsWith("/api/admin/")) {
 
+        return role.equals("ADMIN");
+    }
+    /*
+     * Resource upload:
+     * TEACHER and ADMIN only.
+     */
+    if (path.equals("/api/resources/upload")
+            && method.equals("POST")) {
+
+        return role.equals("TEACHER")
+                || role.equals("ADMIN");
+    }
         /*
          * Resource upload:
          * TEACHER and ADMIN only.
          */
-        if (path.equals("/api/resources/upload")
-                && method.equals("POST")) {
-
-            return role.equals("TEACHER")
-                    || role.equals("ADMIN");
-        }
 
         /*
          * Resource delete:
