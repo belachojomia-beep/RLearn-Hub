@@ -31,9 +31,8 @@ function Dashboard({
 
   const getAuthHeaders = () => {
     const token =
-      sessionStorage.getItem(
-        "rlearnhub_token"
-      ) || user?.token;
+      sessionStorage.getItem("rlearnhub_token") ||
+      user?.token;
 
     if (!token) {
       return {};
@@ -107,9 +106,11 @@ function Dashboard({
         {
           method: "GET",
           headers: {
-              Authorization: `Bearer ${sessionStorage.getItem(
-        "rlearnhub_token"
-            )}`,
+            Authorization: `Bearer ${
+              sessionStorage.getItem(
+                "rlearnhub_token"
+              ) || ""
+            }`,
           },
         }
       );
@@ -165,9 +166,11 @@ function Dashboard({
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${sessionStorage.getItem(
-        "rlearnhub_token"
-            )}`,
+            Authorization: `Bearer ${
+              sessionStorage.getItem(
+                "rlearnhub_token"
+              ) || ""
+            }`,
           },
         }
       );
@@ -228,44 +231,96 @@ function Dashboard({
 
   const loadNotifications = async () => {
     if (!user?.email) {
+      setNotifications([]);
+      setUnreadCount(0);
       return;
     }
 
     try {
       setNotificationLoading(true);
 
-      const response = await fetch(
-        `http://localhost:8080/api/notifications?email=${encodeURIComponent(
-          user.email
-        )}`,
-        {
-          method: "GET",
-          headers: {
-           Authorization: `Bearer ${sessionStorage.getItem(
-        "rlearnhub_token"
-      )}`,
-          },
-        }
-      );
+      const token =
+        sessionStorage.getItem(
+          "rlearnhub_token"
+        ) || user?.token;
 
-      if (!response.ok) {
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers.Authorization =
+          `Bearer ${token}`;
+      }
+
+      const email =
+        encodeURIComponent(user.email);
+
+      // Load notification list and unread count
+      // at the same time.
+      const [
+        notificationsResponse,
+        unreadResponse,
+      ] = await Promise.all([
+        fetch(
+          `http://localhost:8080/api/notifications?email=${email}`,
+          {
+            method: "GET",
+            headers,
+          }
+        ),
+
+        fetch(
+          `http://localhost:8080/api/notifications/unread-count?email=${email}`,
+          {
+            method: "GET",
+            headers,
+          }
+        ),
+      ]);
+
+      if (!notificationsResponse.ok) {
         throw new Error(
-          "Failed to load notifications."
+          `Failed to load notifications. Status: ${notificationsResponse.status}`
         );
       }
 
-      const data =
-        await response.json();
+      if (!unreadResponse.ok) {
+        throw new Error(
+          `Failed to load unread count. Status: ${unreadResponse.status}`
+        );
+      }
 
-      setNotifications(data);
+      const notificationData =
+        await notificationsResponse.json();
 
-      const unread =
-        data.filter(
-          (notification) =>
-            notification.readStatus === false
-        ).length;
+      const unreadData =
+        await unreadResponse.json();
 
-      setUnreadCount(unread);
+      // ==========================================
+      // NEWEST NOTIFICATION FIRST
+      // ==========================================
+
+      const sortedNotifications =
+        Array.isArray(notificationData)
+          ? [...notificationData].sort(
+              (a, b) =>
+                Number(b.id) -
+                Number(a.id)
+            )
+          : [];
+
+      setNotifications(
+        sortedNotifications
+      );
+
+      // ==========================================
+      // BACKEND IS SOURCE OF TRUTH
+      // ==========================================
+
+      setUnreadCount(
+        Number(unreadData) || 0
+      );
 
     } catch (error) {
       console.error(
@@ -281,15 +336,24 @@ function Dashboard({
 
   // ==========================================
   // LOAD NOTIFICATIONS WHEN DASHBOARD OPENS
+  // REFRESH EVERY 5 SECONDS
   // ==========================================
 
   useEffect(() => {
+    if (!user?.email) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    // Load immediately when dashboard opens
     loadNotifications();
 
+    // Refresh every 5 seconds
     const interval =
       setInterval(() => {
         loadNotifications();
-      }, 30000);
+      }, 5000);
 
     return () => {
       clearInterval(interval);
@@ -321,12 +385,16 @@ function Dashboard({
         );
       }
 
+      // ==========================================
+      // UPDATE NOTIFICATION IMMEDIATELY
+      // ==========================================
+
       setNotifications(
         (previousNotifications) =>
           previousNotifications.map(
             (notification) =>
-              notification.id ===
-              notificationId
+              Number(notification.id) ===
+              Number(notificationId)
                 ? {
                     ...notification,
                     readStatus: true,
@@ -335,12 +403,44 @@ function Dashboard({
           )
       );
 
+      // ==========================================
+      // GET REAL UNREAD COUNT FROM BACKEND
+      // ==========================================
+
+      const token =
+        sessionStorage.getItem(
+          "rlearnhub_token"
+        ) || user?.token;
+
+      const unreadResponse =
+        await fetch(
+          `http://localhost:8080/api/notifications/unread-count?email=${encodeURIComponent(
+            user.email
+          )}`,
+          {
+            method: "GET",
+            headers: {
+              ...(token
+                ? {
+                    Authorization:
+                      `Bearer ${token}`,
+                  }
+                : {}),
+            },
+          }
+        );
+
+      if (!unreadResponse.ok) {
+        throw new Error(
+          "Failed to reload unread count."
+        );
+      }
+
+      const unreadData =
+        await unreadResponse.json();
+
       setUnreadCount(
-        (previousCount) =>
-          Math.max(
-            previousCount - 1,
-            0
-          )
+        Number(unreadData) || 0
       );
 
     } catch (error) {
@@ -348,6 +448,9 @@ function Dashboard({
         "Mark notification error:",
         error
       );
+
+      // Reload from backend if something failed
+      loadNotifications();
     }
   };
 
@@ -366,6 +469,7 @@ function Dashboard({
     if (
       unreadNotifications.length === 0
     ) {
+      setUnreadCount(0);
       return;
     }
 
@@ -398,6 +502,10 @@ function Dashboard({
         );
       }
 
+      // ==========================================
+      // UPDATE ALL NOTIFICATIONS LOCALLY
+      // ==========================================
+
       setNotifications(
         (previousNotifications) =>
           previousNotifications.map(
@@ -408,6 +516,10 @@ function Dashboard({
           )
       );
 
+      // ==========================================
+      // BELL COUNT = ZERO
+      // ==========================================
+
       setUnreadCount(0);
 
     } catch (error) {
@@ -415,6 +527,9 @@ function Dashboard({
         "Mark all notifications error:",
         error
       );
+
+      // Reload from database if something failed
+      loadNotifications();
     }
   };
 
@@ -536,6 +651,7 @@ function Dashboard({
             <span>
               Resource Library
             </span>
+
           </button>
 
 
@@ -551,6 +667,7 @@ function Dashboard({
             <span>
               Announcements
             </span>
+
           </button>
 
 
@@ -569,6 +686,7 @@ function Dashboard({
                 <span>
                   Upload Resource
                 </span>
+
               </button>
 
 
@@ -584,6 +702,7 @@ function Dashboard({
                 <span>
                   Create Announcement
                 </span>
+
               </button>
 
             </>
@@ -649,7 +768,7 @@ function Dashboard({
               className="notification-button"
               onClick={() =>
                 setShowNotifications(
-                  !showNotifications
+                  (current) => !current
                 )
               }
               aria-label="Notifications"
@@ -759,10 +878,12 @@ function Dashboard({
                           >
 
                             <div
-                              className={`notification-type-icon ${(
-                                notification.type ||
-                                ""
-                              ).toLowerCase()}`}
+                              className={`notification-type-icon ${
+                                (
+                                  notification.type ||
+                                  ""
+                                ).toLowerCase()
+                              }`}
                             >
                               {getNotificationIcon(
                                 notification.type

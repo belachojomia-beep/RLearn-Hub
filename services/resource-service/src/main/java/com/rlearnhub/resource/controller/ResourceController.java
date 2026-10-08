@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,33 +60,34 @@ public class ResourceController {
     // =========================================================
     // GET ALL RESOURCES
     // =========================================================
-
-    @GetMapping
-    public List<Resource> getAllResources() {
-        return resourceRepository.findAll();
-    }
+        @GetMapping
+        public List<Resource> getAllResources() {
+        return resourceRepository
+                .findByStatusIgnoreCaseOrderByIdDesc("APPROVED");
+        }
 
     // =========================================================
     // GET RESOURCE BY ID
     // =========================================================
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Resource> getResourceById(
-            @PathVariable Long id
-    ) {
+        @GetMapping("/{id}")
+        public ResponseEntity<Resource> getResourceById(@PathVariable Long id) {
         return resourceRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
+            .filter(resource -> "APPROVED".equalsIgnoreCase(resource.getStatus()))
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+}
     // =========================================================
     // GET RECENT RESOURCES
     // =========================================================
 
     @GetMapping("/recent")
-    public List<Resource> getRecentResources() {
-        return resourceRepository.findTop4ByOrderByIdDesc();
-    }
+        public List<Resource> getRecentResources() {
+         return resourceRepository
+            .findByStatusIgnoreCaseOrderByIdDesc("APPROVED")
+            .stream()
+            .limit(4)
+            .toList();
+                }
 
     // =========================================================
     // CREATE RESOURCE
@@ -301,13 +304,15 @@ public class ResourceController {
             @PathVariable Long id
     ) throws IOException {
 
-        Resource resource =
-                resourceRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Resource not found"
-                                )
-                        );
+        Resource resource = resourceRepository.findById(id)
+        .filter(r -> "APPROVED".equalsIgnoreCase(r.getStatus()))
+        .orElseThrow(() ->
+                new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Resource not found"
+                )
+        );
+
 
         if (resource.getFilePath() == null ||
                 resource.getFilePath().isBlank()) {
@@ -366,14 +371,14 @@ public class ResourceController {
             @RequestParam String email
     ) throws IOException {
 
-        Resource resource =
-                resourceRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Resource not found"
-                                )
-                        );
-
+        Resource resource = resourceRepository.findById(id)
+        .filter(r -> "APPROVED".equalsIgnoreCase(r.getStatus()))
+        .orElseThrow(() ->
+                new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Resource not found"
+                )
+        );
         // ---------------------------------------------------------
         // CHECK FILE PATH
         // ---------------------------------------------------------
@@ -445,88 +450,143 @@ public class ResourceController {
                 )
                 .body(fileResource);
     }
+        // =========================================================
+// ADMIN REVIEW RESOURCES
+// =========================================================
 
-    // =========================================================
-    // DELETE RESOURCE
-    // =========================================================
+@GetMapping("/review")
+public ResponseEntity<List<Resource>> getResourcesForReview() {
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteResource(
-            @PathVariable Long id
-    ) throws IOException {
+    return ResponseEntity.ok(
+            resourceRepository.findByStatusIgnoreCase("PENDING")
+    );
+}
 
-        Resource resource =
-                resourceRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Resource not found"
-                                )
-                        );
+// =========================================================
+// APPROVE RESOURCE
+// =========================================================
 
-        // ---------------------------------------------------------
-        // DELETE PHYSICAL FILE
-        // ---------------------------------------------------------
+@PutMapping("/{id}/approve")
+public ResponseEntity<?> approveResource(
+        @PathVariable Long id
+) {
 
-        if (resource.getFilePath() != null &&
-                !resource.getFilePath().isBlank()) {
+    return resourceRepository.findById(id)
+            .map(resource -> {
 
-            Path filePath =
-                    Paths.get(resource.getFilePath());
+                resource.setStatus("APPROVED");
 
-            Files.deleteIfExists(filePath);
-        }
+                Resource savedResource =
+                        resourceRepository.save(resource);
 
-        // ---------------------------------------------------------
-        // DELETE DATABASE RECORD
-        // ---------------------------------------------------------
+                return ResponseEntity.ok(savedResource);
+            })
+            .orElse(ResponseEntity.notFound().build());
+}
 
-        resourceRepository.deleteById(id);
+// =========================================================
+// REJECT RESOURCE
+// =========================================================
 
-        return ResponseEntity.ok(
-                "Resource deleted successfully."
-        );
+@PutMapping("/{id}/reject")
+public ResponseEntity<?> rejectResource(
+        @PathVariable Long id
+) {
+
+    return resourceRepository.findById(id)
+            .map(resource -> {
+
+                resource.setStatus("REJECTED");
+
+                Resource savedResource =
+                        resourceRepository.save(resource);
+
+                return ResponseEntity.ok(savedResource);
+            })
+            .orElse(ResponseEntity.notFound().build());
+}
+
+// =========================================================
+// DELETE RESOURCE
+// =========================================================
+
+@DeleteMapping("/{id}")
+public ResponseEntity<?> deleteResource(
+        @PathVariable Long id
+) throws IOException {
+
+    Resource resource =
+            resourceRepository.findById(id)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Resource not found"
+                            )
+                    );
+
+    // ---------------------------------------------------------
+    // DELETE PHYSICAL FILE
+    // ---------------------------------------------------------
+
+    if (resource.getFilePath() != null &&
+            !resource.getFilePath().isBlank()) {
+
+        Path filePath =
+                Paths.get(resource.getFilePath());
+
+        Files.deleteIfExists(filePath);
     }
 
-    // =========================================================
-    // CONTENT TYPE HELPER
-    // =========================================================
+    // ---------------------------------------------------------
+    // DELETE DATABASE RECORD
+    // ---------------------------------------------------------
 
-    private String getContentType(String extension) {
+    resourceRepository.deleteById(id);
 
-        switch (extension) {
+    return ResponseEntity.ok(
+            "Resource deleted successfully."
+    );
+}
 
-            case "pdf":
-                return "application/pdf";
+// =========================================================
+// CONTENT TYPE HELPER
+// =========================================================
 
-            case "doc":
-                return "application/msword";
+private String getContentType(String extension) {
 
-            case "docx":
-                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    switch (extension) {
 
-            case "ppt":
-                return "application/vnd.ms-powerpoint";
+        case "pdf":
+            return "application/pdf";
 
-            case "pptx":
-                return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        case "doc":
+            return "application/msword";
 
-            case "mp4":
-                return "video/mp4";
+        case "docx":
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-            case "webm":
-                return "video/webm";
+        case "ppt":
+            return "application/vnd.ms-powerpoint";
 
-            case "mov":
-                return "video/quicktime";
+        case "pptx":
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
-            case "avi":
-                return "video/x-msvideo";
+        case "mp4":
+            return "video/mp4";
 
-            case "mkv":
-                return "video/x-matroska";
+        case "webm":
+            return "video/webm";
 
-            default:
-                return "application/octet-stream";
-        }
+        case "mov":
+            return "video/quicktime";
+
+        case "avi":
+            return "video/x-msvideo";
+
+        case "mkv":
+            return "video/x-matroska";
+
+        default:
+            return "application/octet-stream";
     }
+}
 }

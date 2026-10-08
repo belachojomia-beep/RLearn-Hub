@@ -8,4 +8,8 @@ import java.util.List;
 public interface ResourceRepository extends JpaRepository<Resource, Long> {
 
     List<Resource> findTop4ByOrderByIdDesc();
+
+    List<Resource> findByStatusIgnoreCase(String status);
+
+    List<Resource> findByStatusIgnoreCaseOrderByIdDesc(String status);
 }

@@ -40,10 +40,12 @@ public class Resource {
     @Column
     private String filePath;
 
+    @Column(nullable = false)
+    private String status = "PENDING";
+
     // Default constructor
     public Resource() {
     }
-
 
     // Constructor
     public Resource(
@@ -66,7 +68,6 @@ public class Resource {
         this.size = size;
     }
 
-
     // ID
     public Long getId() {
         return id;
@@ -75,7 +76,6 @@ public class Resource {
     public void setId(Long id) {
         this.id = id;
     }
-
 
     // Title
     public String getTitle() {
@@ -86,7 +86,6 @@ public class Resource {
         this.title = title;
     }
 
-
     // Subject
     public String getSubject() {
         return subject;
@@ -95,7 +94,6 @@ public class Resource {
     public void setSubject(String subject) {
         this.subject = subject;
     }
-
 
     // Topic
     public String getTopic() {
@@ -106,7 +104,6 @@ public class Resource {
         this.topic = topic;
     }
 
-
     // Year Level
     public String getYearLevel() {
         return yearLevel;
@@ -115,7 +112,6 @@ public class Resource {
     public void setYearLevel(String yearLevel) {
         this.yearLevel = yearLevel;
     }
-
 
     // Author
     public String getAuthor() {
@@ -126,7 +122,6 @@ public class Resource {
         this.author = author;
     }
 
-
     // Date Added
     public String getDateAdded() {
         return dateAdded;
@@ -135,7 +130,6 @@ public class Resource {
     public void setDateAdded(String dateAdded) {
         this.dateAdded = dateAdded;
     }
-
 
     // Type
     public String getType() {
@@ -146,7 +140,6 @@ public class Resource {
         this.type = type;
     }
 
-
     // Size
     public String getSize() {
         return size;
@@ -156,19 +149,30 @@ public class Resource {
         this.size = size;
     }
 
+    // File Name
     public String getFileName() {
-    return fileName;
+        return fileName;
     }
 
     public void setFileName(String fileName) {
-    this.fileName = fileName;
+        this.fileName = fileName;
     }
 
+    // File Path
     public String getFilePath() {
-    return filePath;
+        return filePath;
     }
 
     public void setFilePath(String filePath) {
-    this.filePath = filePath;
+        this.filePath = filePath;
     }
+
+    // Status
+    public String getStatus() {
+        return status;
     }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}
