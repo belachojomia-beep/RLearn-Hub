@@ -1,209 +1,451 @@
-/* ================================
-   RLearn Hub - Create Announcement
-   ================================ */
+/* =========================================================
+   RLEARN HUB - CREATE ANNOUNCEMENT
+   NAVY BLUE + GOLD + WHITE
+   LIGHT + DARK MODE
+========================================================= */
+
+/* =========================================================
+   GLOBAL VARIABLES
+========================================================= */
+
+:root {
+  --rlearn-navy: #0b2a4a;
+  --rlearn-navy-light: #123d63;
+  --rlearn-navy-hover: #174d78;
+
+  --rlearn-gold: #d4a72c;
+  --rlearn-gold-light: #f3df9a;
+  --rlearn-gold-dark: #b78d1c;
+
+  --rlearn-white: #ffffff;
+  --rlearn-background: #f5f7fa;
+
+  --rlearn-text: #1f2937;
+  --rlearn-muted: #6b7280;
+
+  --rlearn-border: #e5e7eb;
+
+  --rlearn-input: #ffffff;
+
+  --rlearn-shadow:
+    0 4px 18px rgba(11, 42, 74, 0.08);
+}
+
+/* =========================================================
+   DARK MODE
+========================================================= */
+
+body.dark-mode {
+  --rlearn-background: #081b2d;
+  --rlearn-white: #0d2d49;
+
+  --rlearn-text: #f3f4f6;
+  --rlearn-muted: #aebdcb;
+
+  --rlearn-border: #244863;
+
+  --rlearn-input: #102f4a;
+
+  --rlearn-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
 
 .create-announcement-page {
   min-height: 100vh;
-  background: #f5f7fb;
-  color: #17233c;
-  font-family: Arial, Helvetica, sans-serif;
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--rlearn-background);
+  color: var(--rlearn-text);
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
-
-/* ================================
-   Header
-   ================================ */
+/* =========================================================
+   HEADER
+========================================================= */
 
 .create-announcement-header {
   min-height: 82px;
+
   padding: 0 40px;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  background: #071a33;
-  border-bottom: 4px solid #d4af37;
+  background: var(--rlearn-navy);
+
+  border-bottom:
+    4px solid var(--rlearn-gold);
+
+  box-sizing: border-box;
 }
+
+/* =========================================================
+   BRAND
+========================================================= */
 
 .create-announcement-brand {
   display: flex;
   align-items: center;
+
   gap: 14px;
+
+  min-width: 0;
 }
 
-.create-announcement-brand img {
-  width: 52px;
-  height: 52px;
-  object-fit: contain;
+/* =========================================================
+   LOGO
+========================================================= */
+
+.create-announcement-logo {
+  width: 54px;
+  height: 54px;
+
+  object-fit: cover;
+
+  border-radius: 50%;
+
+  border:
+    2px solid var(--rlearn-gold);
+
+  background: #ffffff;
+
+  padding: 2px;
+
+  flex-shrink: 0;
 }
 
-.create-announcement-brand h1 {
+/* =========================================================
+   BRAND TEXT
+========================================================= */
+
+.create-announcement-brand-text {
+  min-width: 0;
+}
+
+.create-announcement-brand-text h1 {
   margin: 0;
-  color: white;
+
+  color: #ffffff;
+
   font-size: 22px;
   font-weight: 700;
+
+  line-height: 1.2;
 }
 
-.create-announcement-brand p {
+.create-announcement-brand-text p {
   margin: 4px 0 0;
-  color: #d4af37;
+
+  color: var(--rlearn-gold-light);
+
   font-size: 13px;
+  font-weight: 500;
+
+  line-height: 1.2;
 }
 
-
-/* ================================
-   Back Button
-   ================================ */
+/* =========================================================
+   BACK TO DASHBOARD BUTTON
+========================================================= */
 
 .back-dashboard-button {
-  border: 1px solid #d4af37;
+  border:
+    1px solid var(--rlearn-gold);
+
   background: transparent;
-  color: white;
+
+  color: #ffffff;
 
   padding: 10px 18px;
+
   border-radius: 8px;
 
   font-size: 14px;
   font-weight: 600;
 
   cursor: pointer;
-  transition: 0.2s ease;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .back-dashboard-button:hover {
-  background: #d4af37;
-  color: #071a33;
+  background: var(--rlearn-gold);
+
+  color: var(--rlearn-navy);
+
+  transform: translateY(-1px);
 }
 
+.back-dashboard-button:active {
+  transform: translateY(0);
+}
 
-/* ================================
-   Main Content
-   ================================ */
+.back-dashboard-button:disabled {
+  opacity: 0.55;
+
+  cursor: not-allowed;
+
+  transform: none;
+}
+
+/* =========================================================
+   MAIN CONTENT
+========================================================= */
 
 .create-announcement-content {
+  width: 100%;
   max-width: 850px;
+
   margin: 0 auto;
 
   padding: 45px 30px 70px;
+
+  box-sizing: border-box;
+
+  flex: 1;
 }
 
-
-/* ================================
-   Form Card
-   ================================ */
+/* =========================================================
+   FORM CARD
+========================================================= */
 
 .create-announcement-card {
-  background: white;
+  background: var(--rlearn-white);
 
-  border: 1px solid #e2e6ed;
-  border-top: 5px solid #d4af37;
+  border:
+    1px solid var(--rlearn-border);
+
+  border-top:
+    5px solid var(--rlearn-gold);
 
   border-radius: 14px;
 
   padding: 35px;
 
-  box-shadow: 0 5px 18px rgba(7, 26, 51, 0.08);
+  box-shadow: var(--rlearn-shadow);
+
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
-
-/* ================================
-   Title
-   ================================ */
+/* =========================================================
+   TITLE SECTION
+========================================================= */
 
 .create-announcement-title {
   margin-bottom: 30px;
 }
 
+/* Small RLEARN HUB label */
+
+.create-announcement-label {
+  display: inline-block;
+
+  margin-bottom: 8px;
+
+  color: var(--rlearn-gold-dark);
+
+  font-size: 12px;
+  font-weight: 800;
+
+  letter-spacing: 1.2px;
+}
+
+/* Main heading */
+
 .create-announcement-title h2 {
   margin: 0;
 
-  color: #071a33;
+  color: var(--rlearn-navy);
 
   font-size: 28px;
+  font-weight: 700;
+
+  line-height: 1.25;
 }
+
+body.dark-mode
+.create-announcement-title h2 {
+  color: #ffffff;
+}
+
+/* Description */
 
 .create-announcement-title p {
   margin: 8px 0 0;
 
-  color: #687386;
+  color: var(--rlearn-muted);
 
   font-size: 14px;
+
+  line-height: 1.6;
 }
 
-
-/* ================================
-   Form
-   ================================ */
+/* =========================================================
+   FORM
+========================================================= */
 
 .form-group {
   margin-bottom: 24px;
 }
+
+/* =========================================================
+   LABEL
+========================================================= */
 
 .form-group label {
   display: block;
 
   margin-bottom: 8px;
 
-  color: #071a33;
+  color: var(--rlearn-navy);
 
   font-size: 14px;
   font-weight: 700;
 }
 
+body.dark-mode
+.form-group label {
+  color: #ffffff;
+}
+
+/* =========================================================
+   INPUT + TEXTAREA
+========================================================= */
+
 .form-group input,
 .form-group textarea {
   width: 100%;
+
   box-sizing: border-box;
 
-  border: 1px solid #d7dce5;
-  border-radius: 8px;
+  border:
+    1px solid var(--rlearn-border);
 
-  background: white;
+  border-radius: 9px;
+
+  background: var(--rlearn-input);
+
+  color: var(--rlearn-text);
 
   padding: 12px 14px;
 
-  color: #17233c;
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 
   font-size: 14px;
 
   outline: none;
 
-  transition: border-color 0.2s ease,
-              box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
+
+/* =========================================================
+   INPUT
+========================================================= */
 
 .form-group input {
   height: 46px;
 }
 
+/* =========================================================
+   TEXTAREA
+========================================================= */
+
 .form-group textarea {
   min-height: 150px;
+
   resize: vertical;
 
   line-height: 1.6;
 }
 
+/* =========================================================
+   FOCUS
+========================================================= */
+
 .form-group input:focus,
 .form-group textarea:focus {
-  border-color: #d4af37;
+  border-color: var(--rlearn-gold);
 
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  box-shadow:
+    0 0 0 3px
+    rgba(212, 167, 44, 0.15);
 }
+
+/* =========================================================
+   PLACEHOLDER
+========================================================= */
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: #9aa3b2;
+  color: var(--rlearn-muted);
+
+  opacity: 0.8;
 }
 
+/* =========================================================
+   DISABLED INPUT
+========================================================= */
 
-/* ================================
-   Author
-   ================================ */
+.form-group input:disabled,
+.form-group textarea:disabled {
+  opacity: 0.65;
+
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   CHARACTER COUNTER
+========================================================= */
+
+.input-helper {
+  display: block;
+
+  margin-top: 6px;
+
+  color: var(--rlearn-muted);
+
+  font-size: 12px;
+
+  text-align: right;
+}
+
+/* =========================================================
+   AUTHOR
+========================================================= */
 
 .announcement-author {
   display: flex;
+
   align-items: center;
+
   gap: 7px;
 
   margin-top: 5px;
@@ -211,37 +453,59 @@
 
   padding: 14px 16px;
 
-  background: #f5f7fb;
+  background:
+    rgba(212, 167, 44, 0.08);
 
-  border-radius: 8px;
+  border:
+    1px solid
+    rgba(212, 167, 44, 0.22);
 
-  color: #687386;
+  border-radius: 9px;
+
+  color: var(--rlearn-muted);
 
   font-size: 14px;
 }
 
-.announcement-author strong {
-  color: #071a33;
+.announcement-author::before {
+  font-size: 16px;
 }
 
+.announcement-author strong {
+  color: var(--rlearn-navy);
 
-/* ================================
-   Form Actions
-   ================================ */
+  font-weight: 700;
+}
+
+body.dark-mode
+.announcement-author strong {
+  color: var(--rlearn-gold-light);
+}
+
+/* =========================================================
+   FORM ACTIONS
+========================================================= */
 
 .form-actions {
   display: flex;
+
   justify-content: flex-end;
+
   gap: 12px;
 
   padding-top: 22px;
 
-  border-top: 1px solid #edf0f4;
+  border-top:
+    1px solid var(--rlearn-border);
 }
+
+/* =========================================================
+   GENERAL BUTTON
+========================================================= */
 
 .cancel-button,
 .post-announcement-button {
-  min-width: 130px;
+  min-width: 145px;
 
   padding: 11px 18px;
 
@@ -252,91 +516,233 @@
 
   cursor: pointer;
 
-  transition: 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 8px;
 }
 
+/* =========================================================
+   CANCEL BUTTON
+========================================================= */
+
 .cancel-button {
-  border: 1px solid #cfd5df;
+  border:
+    1px solid var(--rlearn-border);
 
-  background: white;
+  background: var(--rlearn-white);
 
-  color: #071a33;
+  color: var(--rlearn-navy);
 }
 
 .cancel-button:hover {
-  background: #f1f3f6;
+  background: var(--rlearn-background);
+
+  border-color:
+    var(--rlearn-navy-light);
+
+  transform: translateY(-1px);
 }
 
+body.dark-mode
+.cancel-button {
+  color: #ffffff;
+}
+
+/* =========================================================
+   POST BUTTON
+========================================================= */
+
 .post-announcement-button {
-  border: 1px solid #d4af37;
+  border:
+    1px solid var(--rlearn-gold);
 
-  background: #d4af37;
+  background: var(--rlearn-gold);
 
-  color: #071a33;
+  color: var(--rlearn-navy);
 }
 
 .post-announcement-button:hover {
-  background: #c39d2f;
+  background: var(--rlearn-gold-dark);
+
+  border-color: var(--rlearn-gold-dark);
+
+  transform: translateY(-1px);
 }
+
+.post-announcement-button:active {
+  transform: translateY(0);
+}
+
+/* =========================================================
+   DISABLED POST BUTTON
+========================================================= */
 
 .post-announcement-button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
+
   cursor: not-allowed;
+
+  transform: none;
 }
 
+/* =========================================================
+   LOADING SPINNER
+========================================================= */
 
-/* ================================
-   Footer
-   ================================ */
+.button-spinner {
+  display: inline-block;
+
+  font-size: 16px;
+
+  line-height: 1;
+
+  animation:
+    announcement-spin 0.8s linear infinite;
+}
+
+@keyframes announcement-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
 
 .create-announcement-footer {
+  width: 100%;
+
   padding: 22px 30px;
+
+  box-sizing: border-box;
 
   text-align: center;
 
-  border-top: 1px solid #e2e6ed;
+  border-top:
+    1px solid var(--rlearn-border);
 
-  background: white;
+  background: var(--rlearn-white);
 
-  color: #7a8494;
+  color: var(--rlearn-muted);
 
   font-size: 13px;
+
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
 }
 
+/* =========================================================
+   TABLET
+========================================================= */
 
-/* ================================
-   Responsive
-   ================================ */
+@media (max-width: 850px) {
+
+  .create-announcement-header {
+    padding: 0 25px;
+  }
+
+  .create-announcement-content {
+    padding:
+      35px 22px
+      55px;
+  }
+
+  .create-announcement-card {
+    padding: 30px;
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
 
 @media (max-width: 700px) {
 
   .create-announcement-header {
-    padding: 15px 20px;
+    min-height: auto;
+
+    padding:
+      15px 18px;
+
+    gap: 15px;
   }
 
-  .create-announcement-brand img {
+  .create-announcement-brand {
+    gap: 10px;
+  }
+
+  .create-announcement-logo {
     width: 44px;
     height: 44px;
   }
 
-  .create-announcement-brand h1 {
+  .create-announcement-brand-text h1 {
     font-size: 18px;
   }
 
+  .create-announcement-brand-text p {
+    font-size: 12px;
+  }
+
+  .back-dashboard-button {
+    padding: 8px 12px;
+
+    font-size: 13px;
+
+    white-space: nowrap;
+  }
+
   .create-announcement-content {
-    padding: 30px 18px 50px;
+    padding:
+      30px 18px
+      50px;
   }
 
   .create-announcement-card {
-    padding: 24px 20px;
+    padding:
+      24px 20px;
+
+    border-radius: 12px;
+  }
+
+  .create-announcement-title {
+    margin-bottom: 25px;
   }
 
   .create-announcement-title h2 {
     font-size: 24px;
   }
 
+  .create-announcement-title p {
+    font-size: 13px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
   .form-actions {
     flex-direction: column-reverse;
+
+    gap: 10px;
   }
 
   .cancel-button,
@@ -344,8 +750,101 @@
     width: 100%;
   }
 
+  .announcement-author {
+    align-items: flex-start;
+
+    flex-wrap: wrap;
+  }
+
+  .create-announcement-footer {
+    padding:
+      20px 18px;
+
+    font-size: 12px;
+  }
+}
+
+/* =========================================================
+   SMALL PHONES
+========================================================= */
+
+@media (max-width: 480px) {
+
+  .create-announcement-header {
+    flex-direction: column;
+
+    align-items: stretch;
+
+    padding:
+      15px;
+  }
+
+  .create-announcement-brand {
+    justify-content: center;
+  }
+
   .back-dashboard-button {
-    padding: 8px 12px;
-    font-size: 13px;
+    width: 100%;
+  }
+
+  .create-announcement-content {
+    padding:
+      20px 12px
+      40px;
+  }
+
+  .create-announcement-card {
+    padding:
+      22px 16px;
+  }
+
+  .create-announcement-title h2 {
+    font-size: 22px;
+  }
+
+  .form-group input {
+    height: 44px;
+  }
+
+  .form-group textarea {
+    min-height: 130px;
+  }
+}
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+.back-dashboard-button:focus-visible,
+.cancel-button:focus-visible,
+.post-announcement-button:focus-visible,
+.form-group input:focus-visible,
+.form-group textarea:focus-visible {
+  outline:
+    3px solid
+    rgba(212, 167, 44, 0.35);
+
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   REDUCE MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .create-announcement-page,
+  .create-announcement-card,
+  .create-announcement-footer,
+  .form-group input,
+  .form-group textarea,
+  .back-dashboard-button,
+  .cancel-button,
+  .post-announcement-button {
+    transition: none;
+  }
+
+  .button-spinner {
+    animation: none;
   }
 }

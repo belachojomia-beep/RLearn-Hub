@@ -1,87 +1,237 @@
+/* =========================================================
+   RLEARN HUB - RESOURCE DETAILS
+   NAVY BLUE + GOLD + WHITE
+   LIGHT + DARK MODE
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   THEME VARIABLES
+========================================================= */
+
+:root {
+  --resource-navy: #0b2a4a;
+  --resource-navy-light: #123d63;
+  --resource-navy-hover: #174d78;
+
+  --resource-gold: #d4a72c;
+  --resource-gold-light: #f3df9a;
+  --resource-gold-dark: #b78d1c;
+
+  --resource-white: #ffffff;
+  --resource-bg: #f5f7fa;
+
+  --resource-text: #1f2937;
+  --resource-muted: #6b7280;
+  --resource-light-text: #9ca3af;
+
+  --resource-border: #e5e7eb;
+  --resource-soft-bg: #f8fafc;
+
+  --resource-shadow:
+    0 5px 20px rgba(11, 42, 74, 0.08);
+}
+
+/* =========================================================
+   MAIN PAGE
+========================================================= */
+
 .resource-details-page {
   min-height: 100vh;
   padding: 30px 38px;
-  background: #f5f7fa;
-  color: #1f2937;
+  background: var(--resource-bg);
+  color: var(--resource-text);
+
+  display: flex;
+  flex-direction: column;
 }
+
+/* =========================================================
+   HEADER
+========================================================= */
 
 .resource-details-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 25px;
+
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+
+  border-bottom: 1px solid var(--resource-border);
 }
 
-.resource-details-header h1 {
+/* =========================================================
+   BRAND
+========================================================= */
+
+.resource-details-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+/* Rounded School Logo */
+
+.resource-details-logo {
+  width: 54px;
+  height: 54px;
+
+  object-fit: cover;
+
+  border-radius: 50%;
+  border: 2px solid var(--resource-gold);
+
+  background: var(--resource-white);
+
+  box-shadow:
+    0 3px 10px rgba(11, 42, 74, 0.12);
+}
+
+/* Brand Text */
+
+.resource-details-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-details-brand-text h1 {
   margin: 0;
-  color: #0b2a4a;
-  font-size: 27px;
+
+  color: var(--resource-navy);
+
+  font-size: 22px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
-.resource-details-header p {
-  margin: 6px 0 0;
-  color: #6b7280;
-  font-size: 13px;
+.resource-details-brand-text p {
+  margin: 4px 0 0;
+
+  color: var(--resource-muted);
+
+  font-size: 12px;
+  font-weight: 500;
 }
+
+/* =========================================================
+   BACK BUTTON
+========================================================= */
 
 .resource-details-back {
-  padding: 10px 15px;
-  border: 1px solid #d4a72c;
-  border-radius: 7px;
-  background: white;
-  color: #b78d1c;
+  min-height: 40px;
+
+  padding: 0 16px;
+
+  border: 1px solid var(--resource-gold);
+  border-radius: 8px;
+
+  background: var(--resource-white);
+  color: var(--resource-gold-dark);
+
   font-size: 12px;
   font-weight: 700;
+
   cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .resource-details-back:hover {
-  background: #d4a72c;
-  color: #0b2a4a;
+  background: var(--resource-gold);
+  color: var(--resource-navy);
+
+  transform: translateY(-1px);
 }
 
+/* =========================================================
+   MAIN CONTAINER
+========================================================= */
+
 .resource-details-container {
+  width: 100%;
   max-width: 900px;
+
   margin: 0 auto;
 }
 
+/* =========================================================
+   RESOURCE CARD
+========================================================= */
+
 .resource-details-card {
   padding: 30px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  box-shadow: 0 5px 20px rgba(11, 42, 74, 0.07);
+
+  background: var(--resource-white);
+
+  border: 1px solid var(--resource-border);
+  border-radius: 15px;
+
+  box-shadow: var(--resource-shadow);
 }
+
+/* =========================================================
+   RESOURCE TOP SECTION
+========================================================= */
 
 .resource-details-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+
+  gap: 20px;
+
+  margin-bottom: 22px;
 }
+
+/* =========================================================
+   FILE ICON
+========================================================= */
 
 .resource-file-icon {
   width: 58px;
   height: 64px;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #dfe5eb;
-  border-radius: 7px;
-  background: #f8fafc;
-  color: #0b2a4a;
+
+  border: 1px solid var(--resource-border);
+  border-radius: 9px;
+
+  background: var(--resource-soft-bg);
+  color: var(--resource-navy);
+
   font-size: 11px;
   font-weight: 800;
+
+  text-transform: uppercase;
 }
 
+/* =========================================================
+   RESOURCE TYPE BADGE
+========================================================= */
+
 .resource-details-type {
-  padding: 6px 10px;
-  border-radius: 5px;
-  color: white;
+  padding: 6px 11px;
+
+  border-radius: 6px;
+
+  color: #ffffff;
+
   font-size: 10px;
   font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .resource-details-type.pdf {
@@ -89,115 +239,394 @@
 }
 
 .resource-details-type.ppt {
-  background: #b78d1c;
+  background: var(--resource-gold-dark);
 }
 
 .resource-details-type.doc {
-  background: #0b2a4a;
+  background: var(--resource-navy);
 }
 
-.resource-details-card h2 {
+/* Additional file types */
+
+.resource-details-type.docx {
+  background: var(--resource-navy);
+}
+
+.resource-details-type.pptx {
+  background: var(--resource-gold-dark);
+}
+
+.resource-details-type.video {
+  background: #6b46c1;
+}
+
+/* =========================================================
+   RESOURCE HEADING
+========================================================= */
+
+.resource-details-heading {
+  margin-bottom: 5px;
+}
+
+.resource-details-heading h2 {
   margin: 0;
-  color: #0b2a4a;
+
+  color: var(--resource-navy);
+
   font-size: 24px;
   font-weight: 800;
+
+  line-height: 1.3;
 }
+
+/* =========================================================
+   RESOURCE LABEL
+========================================================= */
+
+.resource-details-label {
+  display: inline-block;
+
+  margin-bottom: 7px;
+
+  color: var(--resource-gold-dark);
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* =========================================================
+   SUBJECT
+========================================================= */
 
 .resource-details-subject {
   margin: 7px 0 25px;
-  color: #b78d1c;
+
+  color: var(--resource-gold-dark);
+
   font-size: 13px;
   font-weight: 700;
 }
 
+/* =========================================================
+   INFORMATION GRID
+========================================================= */
+
 .resource-information-grid {
   display: grid;
+
   grid-template-columns: repeat(3, 1fr);
+
   gap: 1px;
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
+
   overflow: hidden;
+
+  border: 1px solid var(--resource-border);
+  border-radius: 10px;
+
+  background: var(--resource-border);
 }
 
+/* =========================================================
+   INFORMATION ITEM
+========================================================= */
+
 .resource-information-item {
+  min-height: 78px;
+
   padding: 17px;
-  background: #fafbfc;
+
+  background: var(--resource-soft-bg);
 }
 
 .resource-information-item span {
   display: block;
-  margin-bottom: 5px;
-  color: #9ca3af;
+
+  margin-bottom: 6px;
+
+  color: var(--resource-light-text);
+
   font-size: 10px;
+  font-weight: 600;
+
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .resource-information-item strong {
-  color: #374151;
+  display: block;
+
+  color: var(--resource-text);
+
   font-size: 12px;
+  font-weight: 700;
+
+  word-break: break-word;
 }
+
+/* =========================================================
+   DESCRIPTION
+========================================================= */
 
 .resource-description {
   margin-top: 25px;
   padding-top: 20px;
-  border-top: 1px solid #edf0f3;
+
+  border-top: 1px solid var(--resource-border);
 }
 
 .resource-description h3 {
   margin: 0 0 8px;
-  color: #0b2a4a;
+
+  color: var(--resource-navy);
+
   font-size: 16px;
+  font-weight: 800;
 }
 
 .resource-description p {
   margin: 0;
-  color: #6b7280;
+
+  color: var(--resource-muted);
+
   font-size: 12px;
   line-height: 1.7;
 }
 
+/* =========================================================
+   ACTION BUTTONS
+========================================================= */
+
 .resource-details-actions {
   display: flex;
+  align-items: center;
+
   gap: 10px;
+
   margin-top: 25px;
 }
 
 .resource-details-actions button {
-  min-height: 40px;
-  padding: 0 18px;
-  border-radius: 7px;
+  min-height: 42px;
+
+  padding: 0 19px;
+
+  border-radius: 8px;
+
   font-size: 12px;
   font-weight: 700;
+
   cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
 }
 
+.resource-details-actions button:hover {
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   VIEW BUTTON
+========================================================= */
+
 .resource-view-button {
-  border: 1px solid #0b2a4a;
-  background: white;
-  color: #0b2a4a;
+  border: 1px solid var(--resource-navy);
+
+  background: var(--resource-white);
+  color: var(--resource-navy);
 }
 
 .resource-view-button:hover {
-  background: #0b2a4a;
-  color: white;
+  background: var(--resource-navy);
+  color: var(--resource-white);
 }
 
+/* =========================================================
+   DOWNLOAD BUTTON
+========================================================= */
+
 .resource-download-button {
-  border: 1px solid #d4a72c;
-  background: #d4a72c;
-  color: #0b2a4a;
+  border: 1px solid var(--resource-gold);
+
+  background: var(--resource-gold);
+  color: var(--resource-navy);
 }
 
 .resource-download-button:hover {
-  background: #b78d1c;
-  border-color: #b78d1c;
+  background: var(--resource-gold-dark);
+  border-color: var(--resource-gold-dark);
+
+  color: var(--resource-white);
 }
 
-.resource-details-footer {
-  padding: 30px 0 5px;
-  color: #8a929b;
+/* =========================================================
+   RESOURCE NOT FOUND
+========================================================= */
+
+.resource-not-found {
+  max-width: 600px;
+
+  margin: 50px auto;
+  padding: 45px 30px;
+
+  background: var(--resource-white);
+
+  border: 1px solid var(--resource-border);
+  border-radius: 15px;
+
   text-align: center;
+
+  box-shadow: var(--resource-shadow);
+}
+
+.not-found-icon {
+  width: 58px;
+  height: 58px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 0 auto 15px;
+
+  border-radius: 50%;
+
+  background: var(--resource-gold-light);
+  color: var(--resource-navy);
+
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.resource-not-found h2 {
+  margin: 0 0 8px;
+
+  color: var(--resource-navy);
+
+  font-size: 20px;
+}
+
+.resource-not-found p {
+  margin: 0;
+
+  color: var(--resource-muted);
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.resource-details-footer {
+  margin-top: auto;
+
+  padding: 35px 0 5px;
+
+  color: var(--resource-light-text);
+
+  text-align: center;
+
   font-size: 10px;
 }
+
+/* =========================================================
+   DARK MODE
+========================================================= */
+
+body.dark-mode .resource-details-page {
+  --resource-bg: #081b2d;
+  --resource-white: #0d2d49;
+
+  --resource-text: #f3f4f6;
+  --resource-muted: #aebdcb;
+  --resource-light-text: #8fa4b6;
+
+  --resource-border: #244863;
+  --resource-soft-bg: #102f49;
+
+  --resource-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .resource-details-brand-text h1 {
+  color: #ffffff;
+}
+
+body.dark-mode .resource-details-brand-text p {
+  color: var(--resource-muted);
+}
+
+body.dark-mode .resource-details-back {
+  background: #102f49;
+  color: var(--resource-gold);
+}
+
+body.dark-mode .resource-details-back:hover {
+  background: var(--resource-gold);
+  color: var(--resource-navy);
+}
+
+body.dark-mode .resource-details-card {
+  background: #0d2d49;
+}
+
+body.dark-mode .resource-details-heading h2,
+body.dark-mode .resource-description h3 {
+  color: #ffffff;
+}
+
+body.dark-mode .resource-file-icon {
+  background: #102f49;
+  border-color: #244863;
+  color: var(--resource-gold);
+}
+
+body.dark-mode .resource-information-grid {
+  background: #244863;
+}
+
+body.dark-mode .resource-information-item {
+  background: #102f49;
+}
+
+body.dark-mode .resource-information-item strong {
+  color: #f3f4f6;
+}
+
+body.dark-mode .resource-description p {
+  color: var(--resource-muted);
+}
+
+body.dark-mode .resource-view-button {
+  background: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+body.dark-mode .resource-view-button:hover {
+  background: #ffffff;
+  color: var(--resource-navy);
+}
+
+body.dark-mode .resource-not-found {
+  background: #0d2d49;
+}
+
+body.dark-mode .resource-not-found h2 {
+  color: #ffffff;
+}
+
+/* =========================================================
+   TABLET
+========================================================= */
 
 @media (max-width: 800px) {
   .resource-details-page {
@@ -209,6 +638,10 @@
   }
 }
 
+/* =========================================================
+   MOBILE
+========================================================= */
+
 @media (max-width: 600px) {
   .resource-details-page {
     padding: 20px 15px;
@@ -217,6 +650,12 @@
   .resource-details-header {
     flex-direction: column;
     align-items: flex-start;
+
+    gap: 15px;
+  }
+
+  .resource-details-brand {
+    width: 100%;
   }
 
   .resource-details-back {
@@ -227,15 +666,69 @@
     padding: 20px;
   }
 
+  .resource-details-top {
+    align-items: flex-start;
+  }
+
+  .resource-details-heading h2 {
+    font-size: 20px;
+  }
+
   .resource-information-grid {
     grid-template-columns: 1fr;
   }
 
   .resource-details-actions {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .resource-details-actions button {
     width: 100%;
+  }
+}
+
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (max-width: 430px) {
+  .resource-details-page {
+    padding: 16px 12px;
+  }
+
+  .resource-details-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .resource-details-brand-text h1 {
+    font-size: 19px;
+  }
+
+  .resource-details-brand-text p {
+    font-size: 11px;
+  }
+
+  .resource-details-card {
+    padding: 17px;
+    border-radius: 12px;
+  }
+
+  .resource-file-icon {
+    width: 52px;
+    height: 58px;
+  }
+
+  .resource-details-subject {
+    margin-bottom: 20px;
+  }
+
+  .resource-information-item {
+    padding: 14px;
+  }
+
+  .resource-not-found {
+    padding: 35px 20px;
   }
 }

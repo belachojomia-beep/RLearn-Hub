@@ -1,3 +1,15 @@
+/* =========================================================
+   RLEARN HUB - APP CSS
+   LOGIN PAGE + STUDENT/TEACHER DASHBOARD
+   NAVY BLUE + GOLD + WHITE
+   LIGHT + DARK MODE
+========================================================= */
+
+
+/* =========================================================
+   GLOBAL RESET
+========================================================= */
+
 * {
   box-sizing: border-box;
 }
@@ -9,13 +21,20 @@ body,
   min-height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   min-width: 320px;
   font-family: Arial, Helvetica, sans-serif;
+  background: #f4f7fb;
+  color: #1f2937;
 }
 
+
 /* =========================================================
-   MAIN PAGE
+   LOGIN PAGE
 ========================================================= */
 
 .page {
@@ -40,6 +59,7 @@ body {
   background-position: center;
   background-attachment: fixed;
 }
+
 
 /* =========================================================
    GOLD DECORATIVE CIRCLES
@@ -83,8 +103,73 @@ body {
   pointer-events: none;
 }
 
+
 /* =========================================================
-   BRAND / HEADER
+   THEME TOGGLE
+========================================================= */
+
+.theme-toggle {
+  position: absolute;
+
+  top: 18px;
+  right: 22px;
+
+  z-index: 10;
+
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.12);
+
+  color: white;
+
+  cursor: pointer;
+
+  backdrop-filter: blur(8px);
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.22);
+
+  border-color: #d9a928;
+
+  color: #f4d37a;
+
+  transform: rotate(8deg);
+}
+
+.theme-toggle:focus {
+  outline: none;
+
+  border-color: #d9a928;
+
+  box-shadow:
+    0 0 0 3px rgba(217, 169, 40, 0.25);
+}
+
+.theme-toggle svg {
+  display: block;
+  pointer-events: none;
+}
+
+
+/* =========================================================
+   LOGIN BRAND / HEADER
 ========================================================= */
 
 .brand {
@@ -108,13 +193,18 @@ body {
   margin: 0 auto 3px;
 
   filter:
-    drop-shadow(0 3px 5px rgba(0, 0, 0, 0.35));
+    drop-shadow(
+      0 3px 5px rgba(0, 0, 0, 0.35)
+    );
 }
 
 .brand h1 {
   margin: 0;
 
-  font-family: Georgia, "Times New Roman", serif;
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
 
   font-size: 34px;
   font-weight: 700;
@@ -127,7 +217,10 @@ body {
 .brand p {
   margin: 2px 0 0;
 
-  font-family: Georgia, "Times New Roman", serif;
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
 
   font-size: 18px;
   font-weight: 600;
@@ -147,7 +240,10 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* Gold lines beside subtitle */
+
+/* =========================================================
+   GOLD LINES BESIDE SUBTITLE
+========================================================= */
 
 .brand span::before,
 .brand span::after {
@@ -164,6 +260,7 @@ body {
 
   margin: 0 10px;
 }
+
 
 /* =========================================================
    LOGIN CARD
@@ -188,6 +285,7 @@ body {
     0 10px 30px rgba(0, 0, 0, 0.28);
 }
 
+
 /* =========================================================
    SIGN IN TITLE
 ========================================================= */
@@ -197,7 +295,10 @@ body {
 
   text-align: center;
 
-  font-family: Georgia, "Times New Roman", serif;
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
 
   font-size: 25px;
 
@@ -214,8 +315,157 @@ body {
   font-size: 13px;
 }
 
+
+/* =========================================================
+   FORM
+========================================================= */
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card form label {
+  margin-bottom: 5px;
+
+  color: #153e68;
+
+  font-size: 13px;
+
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   STANDARD INPUTS
+========================================================= */
+
+.login-card input {
+  width: 100%;
+
+  height: 40px;
+
+  padding: 0 13px;
+
+  margin-bottom: 10px;
+
+  background: white;
+
+  border: 1.5px solid #ccd7e5;
+
+  border-radius: 7px;
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  font-size: 13px;
+
+  color: #1f2937;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.login-card input::placeholder {
+  color: #9aa9bb;
+}
+
+.login-card input:focus {
+  border-color: #0b3b70;
+
+  box-shadow:
+    0 0 0 3px rgba(11, 59, 112, 0.10);
+}
+
+
+/* =========================================================
+   PASSWORD INPUT
+========================================================= */
+
+.password-input-wrapper {
+  position: relative;
+
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  padding-right: 45px;
+
+  margin-bottom: 10px;
+}
+
+
+/* =========================================================
+   PASSWORD VISIBILITY BUTTON
+========================================================= */
+
+.password-toggle {
+  position: absolute;
+
+  top: 0;
+  right: 0;
+
+  width: 42px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  margin: 0;
+
+  border: none;
+
+  background: transparent;
+
+  color: #6b7280;
+
+  cursor: pointer;
+
+  border-radius: 0 7px 7px 0;
+
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.password-toggle:hover {
+  color: #0b3b70;
+
+  background:
+    rgba(11, 59, 112, 0.06);
+}
+
+.password-toggle:focus {
+  outline: none;
+
+  color: #0b3b70;
+
+  background:
+    rgba(11, 59, 112, 0.06);
+
+  box-shadow:
+    0 0 0 2px rgba(11, 59, 112, 0.15);
+}
+
+.password-toggle:active {
+  transform: scale(0.96);
+}
+
+.password-toggle svg {
+  display: block;
+
+  pointer-events: none;
+}
+
+
 /* =========================================================
    ROLE BUTTONS
+   Kept for compatibility with older Login UI.
 ========================================================= */
 
 .role-buttons {
@@ -244,7 +494,11 @@ body {
 
   cursor: pointer;
 
-  transition: all 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .role:hover {
@@ -264,59 +518,6 @@ body {
     0 4px 10px rgba(11, 59, 112, 0.25);
 }
 
-/* =========================================================
-   FORM
-========================================================= */
-
-form {
-  display: flex;
-  flex-direction: column;
-}
-
-form label {
-  margin-bottom: 5px;
-
-  color: #153e68;
-
-  font-size: 13px;
-
-  font-weight: 700;
-}
-
-input {
-  width: 100%;
-
-  height: 40px;
-
-  padding: 0 13px;
-
-  margin-bottom: 10px;
-
-  background: white;
-
-  border: 1.5px solid #ccd7e5;
-
-  border-radius: 7px;
-
-  font-size: 13px;
-
-  color: #1f2937;
-
-  outline: none;
-
-  transition: 0.2s;
-}
-
-input::placeholder {
-  color: #9aa9bb;
-}
-
-input:focus {
-  border-color: #0b3b70;
-
-  box-shadow:
-    0 0 0 3px rgba(11, 59, 112, 0.10);
-}
 
 /* =========================================================
    FORGOT PASSWORD
@@ -338,6 +539,9 @@ input:focus {
   font-weight: 600;
 
   text-decoration: none;
+
+  transition:
+    color 0.2s ease;
 }
 
 .forgot a:hover {
@@ -345,6 +549,16 @@ input:focus {
 
   text-decoration: underline;
 }
+
+.forgot a:focus {
+  outline: none;
+
+  border-radius: 3px;
+
+  box-shadow:
+    0 0 0 2px rgba(7, 91, 181, 0.15);
+}
+
 
 /* =========================================================
    SIGN IN BUTTON
@@ -363,13 +577,18 @@ input:focus {
 
   color: white;
 
+  font-family: Arial, Helvetica, sans-serif;
+
   font-size: 14px;
 
   font-weight: 700;
 
   cursor: pointer;
 
-  transition: all 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .login-button:hover {
@@ -381,89 +600,31 @@ input:focus {
     0 5px 12px rgba(11, 59, 112, 0.25);
 }
 
-/* =========================================================
-   DIVIDER
-========================================================= */
-
-.divider {
-  display: flex;
-
-  align-items: center;
-
-  gap: 12px;
-
-  margin: 17px 0;
-
-  color: #8a99aa;
-
-  font-size: 12px;
+.login-button:active {
+  transform: translateY(0);
 }
 
-.divider::before,
-.divider::after {
-  content: "";
+.login-button:focus {
+  outline: none;
 
-  flex: 1;
-
-  height: 1px;
-
-  background: #dce2e9;
+  box-shadow:
+    0 0 0 3px rgba(217, 169, 40, 0.25);
 }
 
-.divider span {
-  color: #7b8794;
+.login-button:disabled {
+  opacity: 0.65;
+
+  cursor: not-allowed;
+
+  transform: none;
 }
+
 
 /* =========================================================
-   GOOGLE BUTTON
+   LOGIN FOOTER
 ========================================================= */
 
-.google-button {
-  width: 100%;
-
-  height: 40px;
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  gap: 10px;
-
-  background: white;
-
-  border: 1.5px solid #ccd7e5;
-
-  border-radius: 7px;
-
-  color: #153e68;
-
-  font-size: 13px;
-
-  font-weight: 700;
-
-  cursor: pointer;
-
-  transition: 0.2s;
-}
-
-.google-button:hover {
-  background: #f8fafc;
-
-  border-color: #d9a928;
-}
-
-.google-icon {
-  font-size: 18px;
-
-  font-weight: 700;
-}
-
-/* =========================================================
-   FOOTER
-========================================================= */
-
-footer {
+.page footer {
   position: relative;
 
   z-index: 2;
@@ -476,6 +637,7 @@ footer {
 
   text-align: center;
 }
+
 
 /* =========================================================
    TABLET
@@ -494,7 +656,10 @@ footer {
     background-attachment: scroll;
   }
 
-  /* Logo */
+  .theme-toggle {
+    top: 20px;
+    right: 25px;
+  }
 
   .school-logo {
     width: 75px;
@@ -502,8 +667,6 @@ footer {
 
     margin-bottom: 4px;
   }
-
-  /* Brand */
 
   .brand {
     margin-bottom: 18px;
@@ -521,8 +684,6 @@ footer {
     font-size: 13px;
   }
 
-  /* Login card */
-
   .login-card {
     width: 420px;
 
@@ -532,8 +693,6 @@ footer {
   .login-card h2 {
     font-size: 25px;
   }
-
-  /* Keep roles in one row */
 
   .role-buttons {
     flex-direction: row;
@@ -545,9 +704,11 @@ footer {
     height: 42px;
   }
 
-  /* Inputs */
+  .login-card input {
+    height: 43px;
+  }
 
-  input {
+  .password-toggle {
     height: 43px;
   }
 
@@ -555,15 +716,9 @@ footer {
     height: 44px;
   }
 
-  .google-button {
-    height: 43px;
-  }
-
-  footer {
+  .page footer {
     margin-top: 15px;
   }
-
-  /* Tablet decorative circles */
 
   .page::before {
     width: 420px;
@@ -586,6 +741,7 @@ footer {
   }
 }
 
+
 /* =========================================================
    MOBILE PHONE
    451px - 700px
@@ -606,7 +762,13 @@ footer {
     background-attachment: scroll;
   }
 
-  /* Logo */
+  .theme-toggle {
+    top: 14px;
+    right: 15px;
+
+    width: 39px;
+    height: 39px;
+  }
 
   .school-logo {
     width: 75px;
@@ -615,10 +777,10 @@ footer {
     margin-bottom: 6px;
   }
 
-  /* Brand */
-
   .brand {
     margin-bottom: 18px;
+
+    padding-top: 5px;
   }
 
   .brand h1 {
@@ -642,8 +804,6 @@ footer {
     margin: 0 7px;
   }
 
-  /* Login card */
-
   .login-card {
     width: 100%;
 
@@ -662,8 +822,6 @@ footer {
     margin-bottom: 20px;
   }
 
-  /* Roles stay horizontal */
-
   .role-buttons {
     flex-direction: row;
 
@@ -678,33 +836,23 @@ footer {
     font-size: 13px;
   }
 
-  /* Form */
-
-  input {
+  .login-card input {
     height: 43px;
 
     font-size: 14px;
+  }
+
+  .password-toggle {
+    height: 43px;
   }
 
   .login-button {
     height: 45px;
   }
 
-  .google-button {
-    height: 44px;
-
-    font-size: 13px;
-  }
-
-  .divider {
-    margin: 19px 0;
-  }
-
-  footer {
+  .page footer {
     margin-top: 17px;
   }
-
-  /* Decorative circles */
 
   .page::before {
     width: 320px;
@@ -727,6 +875,7 @@ footer {
   }
 }
 
+
 /* =========================================================
    SMALL MOBILE PHONE
    320px - 450px
@@ -747,7 +896,18 @@ footer {
     background-attachment: scroll;
   }
 
-  /* Logo */
+  .theme-toggle {
+    top: 10px;
+    right: 10px;
+
+    width: 36px;
+    height: 36px;
+  }
+
+  .theme-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
 
   .school-logo {
     width: 65px;
@@ -756,10 +916,10 @@ footer {
     margin-bottom: 5px;
   }
 
-  /* Brand */
-
   .brand {
     margin-bottom: 15px;
+
+    padding-top: 5px;
   }
 
   .brand h1 {
@@ -787,8 +947,6 @@ footer {
     margin: 0 5px;
   }
 
-  /* Login card */
-
   .login-card {
     width: 100%;
 
@@ -809,8 +967,6 @@ footer {
     margin: 4px 0 18px;
   }
 
-  /* Roles */
-
   .role-buttons {
     display: flex;
 
@@ -829,15 +985,11 @@ footer {
     border-radius: 7px;
   }
 
-  /* Labels */
-
-  form label {
+  .login-card form label {
     font-size: 12px;
   }
 
-  /* Inputs */
-
-  input {
+  .login-card input {
     height: 42px;
 
     padding: 0 11px;
@@ -847,7 +999,19 @@ footer {
     margin-bottom: 10px;
   }
 
-  /* Forgot password */
+  .password-input-wrapper input {
+    padding-right: 43px;
+  }
+
+  .password-toggle {
+    width: 39px;
+    height: 42px;
+  }
+
+  .password-toggle svg {
+    width: 19px;
+    height: 19px;
+  }
 
   .forgot {
     margin-top: -4px;
@@ -859,45 +1023,21 @@ footer {
     font-size: 12px;
   }
 
-  /* Sign in */
-
   .login-button {
     height: 43px;
 
     font-size: 13px;
   }
 
-  /* Divider */
-
-  .divider {
-    margin: 18px 0;
-
-    font-size: 11px;
-  }
-
-  /* Google */
-
-  .google-button {
-    height: 42px;
-
-    font-size: 11px;
-  }
-
-  .google-icon {
-    font-size: 16px;
-  }
-
-  /* Footer */
-
-  footer {
+  .page footer {
     margin-top: 15px;
 
     font-size: 10px;
 
     padding-bottom: 3px;
-  }
 
-  /* Decorative circles */
+    line-height: 1.4;
+  }
 
   .page::before {
     width: 270px;
@@ -920,12 +1060,26 @@ footer {
   }
 }
 
+
 /* =========================================================
    VERY SMALL PHONES
    320px - 380px
 ========================================================= */
 
 @media (max-width: 380px) {
+
+  .page {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+
+  .theme-toggle {
+    top: 8px;
+    right: 8px;
+
+    width: 34px;
+    height: 34px;
+  }
 
   .school-logo {
     width: 58px;
@@ -962,210 +1116,538 @@ footer {
     font-size: 10px;
   }
 
-  input {
+  .login-card input {
     height: 40px;
 
     font-size: 12px;
   }
 
+  .password-toggle {
+    height: 40px;
+  }
+
   .login-button {
     height: 42px;
   }
-
-  .google-button {
-    height: 40px;
-
-    font-size: 10px;
-  }
 }
-/* =========================================
-   STUDENT DASHBOARD
-========================================= */
+
+
+/* =========================================================
+   STUDENT / TEACHER DASHBOARD
+========================================================= */
 
 .dashboard-page {
   min-height: 100vh;
+
   background: #f4f7fb;
+
   color: #0b2d4d;
 }
 
 
-/* =========================================
+/* =========================================================
    DASHBOARD HEADER
-========================================= */
+========================================================= */
 
 .dashboard-header {
   width: 100%;
+
   min-height: 80px;
+
   background: #082b4c;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   padding: 12px 50px;
+
   box-sizing: border-box;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+
+  box-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.15);
 }
 
 .dashboard-brand {
   display: flex;
   align-items: center;
+
   gap: 15px;
+
+  min-width: 0;
 }
 
 .dashboard-logo {
   width: 55px;
   height: 55px;
+
   object-fit: contain;
+
+  flex-shrink: 0;
 }
 
 .dashboard-brand h1 {
   margin: 0;
+
   color: white;
+
   font-size: 26px;
+
   font-weight: 700;
 }
 
 .dashboard-brand p {
   margin: 3px 0 0;
+
   color: #e0b52d;
+
   font-size: 13px;
 }
 
 
-/* =========================================
+/* =========================================================
    LOGOUT BUTTON
-========================================= */
+========================================================= */
 
 .logout-button {
   border: 2px solid #e0b52d;
+
   background: transparent;
+
   color: white;
+
   padding: 10px 22px;
+
   border-radius: 8px;
+
   font-size: 14px;
+
   font-weight: 600;
+
   cursor: pointer;
-  transition: 0.2s ease;
+
+  flex-shrink: 0;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .logout-button:hover {
   background: #e0b52d;
+
   color: #082b4c;
+
+  transform: translateY(-1px);
+}
+
+.logout-button:active {
+  transform: translateY(0);
+}
+
+.logout-button:focus {
+  outline: none;
+
+  box-shadow:
+    0 0 0 3px rgba(224, 181, 45, 0.25);
 }
 
 
-/* =========================================
+/* =========================================================
    DASHBOARD CONTENT
-========================================= */
+========================================================= */
 
 .dashboard-content {
   width: 90%;
+
   max-width: 1200px;
+
   margin: 0 auto;
+
   padding: 45px 0 60px;
 }
 
 
-/* =========================================
+/* =========================================================
    WELCOME SECTION
-========================================= */
+========================================================= */
 
 .welcome-section {
   background: white;
+
   border-left: 6px solid #e0b52d;
+
   border-radius: 12px;
+
   padding: 25px 30px;
+
   margin-bottom: 30px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .welcome-section h2 {
   margin: 0 0 8px;
+
   color: #082b4c;
+
   font-size: 28px;
 }
 
 .welcome-section p {
   margin: 0;
+
   color: #667085;
+
   font-size: 15px;
+
+  line-height: 1.6;
 }
 
 
-/* =========================================
+/* =========================================================
    DASHBOARD CARDS
-========================================= */
+========================================================= */
 
 .dashboard-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+
+  grid-template-columns:
+    repeat(2, 1fr);
+
   gap: 25px;
 }
 
 .dashboard-card {
   background: white;
+
   border-radius: 14px;
+
   padding: 28px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.08);
+
   border-top: 4px solid #e0b52d;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .dashboard-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.12);
 }
 
 .card-icon {
   font-size: 35px;
+
   margin-bottom: 12px;
 }
 
 .dashboard-card h3 {
   margin: 0 0 10px;
+
   color: #082b4c;
+
   font-size: 21px;
 }
 
 .dashboard-card p {
   color: #667085;
+
   font-size: 14px;
+
   line-height: 1.6;
+
   min-height: 45px;
 }
 
 .dashboard-card button {
   margin-top: 12px;
+
   padding: 10px 18px;
+
   border: none;
+
   border-radius: 7px;
+
   background: #0b4778;
+
   color: white;
+
   font-weight: 600;
+
   cursor: pointer;
-  transition: 0.2s ease;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .dashboard-card button:hover {
   background: #082b4c;
+
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 4px 10px rgba(8, 43, 76, 0.18);
+}
+
+.dashboard-card button:active {
+  transform: translateY(0);
+}
+
+.dashboard-card button:focus {
+  outline: none;
+
+  box-shadow:
+    0 0 0 3px rgba(11, 71, 120, 0.18);
 }
 
 
-/* =========================================
+/* =========================================================
    DASHBOARD FOOTER
-========================================= */
+========================================================= */
 
 .dashboard-footer {
   text-align: center;
+
   padding: 20px;
+
   background: #082b4c;
+
   color: white;
+
   font-size: 13px;
+
+  line-height: 1.5;
 }
 
 
-/* =========================================
-   TABLET
-========================================= */
+/* =========================================================
+   DARK MODE
+   Login + Student/Teacher Dashboard
+========================================================= */
+
+body.dark-mode {
+  background: #0f172a;
+
+  color: #e5e7eb;
+}
+
+
+/* ---------------------------------------------------------
+   Student/Teacher Dashboard
+--------------------------------------------------------- */
+
+body.dark-mode .dashboard-page {
+  background: #0f172a;
+
+  color: #e5e7eb;
+}
+
+body.dark-mode .dashboard-header {
+  background: #071d33;
+
+  box-shadow:
+    0 3px 14px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .dashboard-brand h1 {
+  color: #f8fafc;
+}
+
+body.dark-mode .dashboard-brand p {
+  color: #f3d16a;
+}
+
+body.dark-mode .welcome-section {
+  background: #172235;
+
+  border-left-color: #d4a72c;
+
+  box-shadow:
+    0 5px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .welcome-section h2 {
+  color: #f8fafc;
+}
+
+body.dark-mode .welcome-section p {
+  color: #aeb9c8;
+}
+
+body.dark-mode .dashboard-card {
+  background: #172235;
+
+  border-top-color: #d4a72c;
+
+  box-shadow:
+    0 5px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .dashboard-card h3 {
+  color: #f8fafc;
+}
+
+body.dark-mode .dashboard-card p {
+  color: #aeb9c8;
+}
+
+body.dark-mode .dashboard-card button {
+  background: #174d78;
+}
+
+body.dark-mode .dashboard-card button:hover {
+  background: #123d63;
+}
+
+body.dark-mode .dashboard-footer {
+  background: #071d33;
+
+  color: #e5e7eb;
+}
+
+
+/* =========================================================
+   DARK MODE LOGIN CARD
+========================================================= */
+
+body.dark-mode .login-card {
+  background: rgba(23, 34, 53, 0.98);
+
+  border-top-color: #d4a72c;
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.45);
+}
+
+body.dark-mode .login-card h2 {
+  color: #f8fafc;
+}
+
+body.dark-mode .welcome {
+  color: #aeb9c8;
+}
+
+body.dark-mode .login-card form label {
+  color: #dce5ef;
+}
+
+body.dark-mode .login-card input {
+  background: #0f172a;
+
+  border-color: #334155;
+
+  color: #f8fafc;
+}
+
+body.dark-mode .login-card input::placeholder {
+  color: #7f8da1;
+}
+
+body.dark-mode .login-card input:focus {
+  border-color: #d4a72c;
+
+  box-shadow:
+    0 0 0 3px rgba(212, 167, 44, 0.12);
+}
+
+body.dark-mode .password-toggle {
+  color: #94a3b8;
+}
+
+body.dark-mode .password-toggle:hover {
+  color: #f3d16a;
+
+  background:
+    rgba(212, 167, 44, 0.08);
+}
+
+body.dark-mode .password-toggle:focus {
+  color: #f3d16a;
+
+  box-shadow:
+    0 0 0 2px rgba(212, 167, 44, 0.18);
+}
+
+body.dark-mode .forgot a {
+  color: #7db8ed;
+}
+
+body.dark-mode .forgot a:hover {
+  color: #f3d16a;
+}
+
+body.dark-mode .login-button {
+  background: #123d63;
+
+  border-color: #d4a72c;
+}
+
+body.dark-mode .login-button:hover {
+  background: #174d78;
+}
+
+
+/* =========================================================
+   DARK MODE ROLE BUTTONS
+========================================================= */
+
+body.dark-mode .role {
+  background: #172235;
+
+  border-color: #334155;
+
+  color: #dce5ef;
+}
+
+body.dark-mode .role:hover {
+  background: #202d42;
+
+  border-color: #d4a72c;
+}
+
+body.dark-mode .role.active {
+  background: #123d63;
+
+  border-color: #d4a72c;
+
+  color: white;
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid #d4a72c;
+
+  outline-offset: 2px;
+}
+
+
+/* =========================================================
+   TABLET DASHBOARD
+========================================================= */
 
 @media (max-width: 900px) {
 
@@ -1183,18 +1665,22 @@ footer {
 }
 
 
-/* =========================================
-   MOBILE
-========================================= */
+/* =========================================================
+   MOBILE DASHBOARD
+========================================================= */
 
 @media (max-width: 600px) {
 
   .dashboard-header {
     padding: 12px 18px;
+
+    min-height: 70px;
   }
 
   .dashboard-brand {
     gap: 10px;
+
+    min-width: 0;
   }
 
   .dashboard-logo {
@@ -1204,19 +1690,25 @@ footer {
 
   .dashboard-brand h1 {
     font-size: 21px;
+
+    white-space: nowrap;
   }
 
   .dashboard-brand p {
     font-size: 10px;
+
+    white-space: nowrap;
   }
 
   .logout-button {
     padding: 8px 12px;
+
     font-size: 12px;
   }
 
   .dashboard-content {
     width: 92%;
+
     padding: 30px 0 45px;
   }
 
@@ -1228,8 +1720,70 @@ footer {
     font-size: 22px;
   }
 
+  .welcome-section p {
+    font-size: 14px;
+  }
+
   .dashboard-card {
     padding: 22px;
   }
+}
 
+
+/* =========================================================
+   EXTRA SMALL DASHBOARD
+========================================================= */
+
+@media (max-width: 400px) {
+
+  .dashboard-header {
+    padding: 10px 12px;
+  }
+
+  .dashboard-brand {
+    gap: 7px;
+  }
+
+  .dashboard-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .dashboard-brand h1 {
+    font-size: 18px;
+  }
+
+  .dashboard-brand p {
+    font-size: 8px;
+  }
+
+  .logout-button {
+    padding: 7px 9px;
+
+    font-size: 11px;
+  }
+
+  .dashboard-content {
+    width: 94%;
+  }
+
+  .welcome-section {
+    padding: 17px;
+  }
+
+  .welcome-section h2 {
+    font-size: 20px;
+  }
+
+  .dashboard-card {
+    padding: 18px;
+  }
+
+  .dashboard-card h3 {
+    font-size: 19px;
+  }
+
+  .dashboard-card p {
+    font-size: 13px;
+  }
 }

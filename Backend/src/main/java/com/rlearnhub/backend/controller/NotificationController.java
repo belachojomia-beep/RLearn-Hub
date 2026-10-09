@@ -8,7 +8,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/notifications")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175"
+})
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
@@ -25,7 +29,7 @@ public class NotificationController {
             @RequestParam String email
     ) {
         return notificationRepository
-                .findByUserEmailOrderByIdDesc(email);
+                .findByUserEmailIgnoreCaseOrderByIdDesc(email);
     }
 
     // Get unread notification count
@@ -34,7 +38,7 @@ public class NotificationController {
             @RequestParam String email
     ) {
         return notificationRepository
-                .findByUserEmailAndReadStatus(email, false)
+                .findByUserEmailIgnoreCaseAndReadStatus(email, false)
                 .size();
     }
 

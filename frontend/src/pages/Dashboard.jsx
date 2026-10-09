@@ -1,6 +1,86 @@
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 import "./Dashboard.css";
 
+const API_URL = "http://localhost:8080";
+const VIEWED_ANNOUNCEMENTS_KEY = "rlearnhub_viewed_announcements_";
+
+// =========================================================
+// HELPERS
+// =========================================================
+function getAuthHeaders() {
+  const token =
+    sessionStorage.getItem("rlearnhub_token") ||
+    localStorage.getItem("rlearnhub_token");
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getViewedStorageKey(email) {
+  return `${VIEWED_ANNOUNCEMENTS_KEY}${email}`;
+}
+
+function getViewedAnnouncementIds(email) {
+  if (!email) return [];
+
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(getViewedStorageKey(email)) || "[]"
+    );
+
+    return Array.isArray(stored) ? stored.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getItemTimestamp(item) {
+  const value =
+    item?.dateAdded ||
+    item?.datePosted ||
+    item?.date ||
+    item?.createdAt ||
+    item?.dateCreated;
+
+  if (!value) return 0;
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function formatDate(value) {
+  if (!value) return "No date";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "Asia/Manila",
+  });
+}
+
+function getResourceType(resource) {
+  const value =
+    resource?.type ||
+    resource?.fileName ||
+    resource?.originalFileName ||
+    "FILE";
+
+  const parts = String(value).split(".");
+  return parts.length > 1
+    ? parts.pop().toUpperCase().slice(0, 5)
+    : String(value).toUpperCase().slice(0, 5);
+}
+
+// =========================================================
+// DASHBOARD
+// =========================================================
 function Dashboard({
   user,
   onLogout,
@@ -9,137 +89,115 @@ function Dashboard({
   onUploadResource,
   onCreateAnnouncement,
 }) {
-  // ==========================================
-  // USER ROLE
-  // ==========================================
+  const userRole = String(user?.role || "STUDENT").toUpperCase();
+  const isTeacher = userRole === "TEACHER";
+  const isAdmin = userRole === "ADMIN";
+  const canManage = isTeacher || isAdmin;
+  const userEmail = user?.email || "";
 
-  const isTeacher =
-    user?.role === "TEACHER" ||
-    user?.role === "Teacher";
-
-  const isAdmin =
-    user?.role === "ADMIN" ||
-    user?.role === "Admin";
-
-  const canManage =
-    isTeacher || isAdmin;
-
-
-  // ==========================================
-  // JWT AUTHORIZATION
-  // ==========================================
-
-  const getAuthHeaders = () => {
-    const token =
-      sessionStorage.getItem("rlearnhub_token") ||
-      user?.token;
-
-    if (!token) {
-      return {};
-    }
-
-    return {
-      Authorization: `Bearer ${token}`,
-    };
-  };
-
-
-  // ==========================================
-  // DASHBOARD STATISTICS
-  // ==========================================
-
+  // =======================================================
+  // STATISTICS
+  // =======================================================
   const [stats, setStats] = useState({
     resources: 0,
     downloads: 0,
     subjects: 0,
   });
 
-  const [statsLoading, setStatsLoading] =
-    useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
 
-  const [recentResources, setRecentResources] =
-    useState([]);
-
+  // =======================================================
+  // RECENT RESOURCES
+  // =======================================================
+  const [recentResources, setRecentResources] = useState([]);
   const [recentResourcesLoading, setRecentResourcesLoading] =
     useState(true);
 
+  // =======================================================
+  // ANNOUNCEMENTS
+  // =======================================================
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] =
+    useState(true);
 
-  // ==========================================
-  // NOTIFICATIONS
-  // ==========================================
+  // Initialize viewed IDs without calling setState inside an effect.
+  const [viewedState, setViewedState] = useState(() => ({
+    email: userEmail,
+    ids: getViewedAnnouncementIds(userEmail),
+  }));
 
-  const [notifications, setNotifications] =
-    useState([]);
+  // Read the correct user's saved IDs when the active user changes.
+  const viewedAnnouncementIds =
+    viewedState.email === userEmail
+      ? viewedState.ids
+      : getViewedAnnouncementIds(userEmail);
 
-  const [unreadCount, setUnreadCount] =
-    useState(0);
+  const markAnnouncementAsViewed = useCallback(
+    (announcementId) => {
+      if (!userEmail || announcementId == null) return;
 
-  const [showNotifications, setShowNotifications] =
-    useState(false);
+      const storageKey = getViewedStorageKey(userEmail);
+      const savedIds = getViewedAnnouncementIds(userEmail);
 
-  const [notificationLoading, setNotificationLoading] =
-    useState(false);
+      const updatedIds = [
+        ...new Set([...savedIds, String(announcementId)]),
+      ];
 
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updatedIds));
 
-  // ==========================================
-  // LOAD DASHBOARD STATISTICS
-  // ==========================================
-
-  const loadDashboardStats = async () => {
-    try {
-      setStatsLoading(true);
-
-      if (!user?.email) {
-        setStats({
-          resources: 0,
-          downloads: 0,
-          subjects: 0,
+        setViewedState({
+          email: userEmail,
+          ids: updatedIds,
         });
-
-        return;
+      } catch (error) {
+        console.error("Unable to save viewed announcement:", error);
       }
+    },
+    [userEmail]
+  );
 
+  // =======================================================
+  // LOAD DASHBOARD STATISTICS
+  // =======================================================
+  const loadDashboardStats = useCallback(async () => {
+    if (!userEmail) {
+      setStatsLoading(false);
+      setStatsError("");
+      return;
+    }
+
+    setStatsLoading(true);
+
+    try {
       const response = await fetch(
-        `http://localhost:8080/api/dashboard/stats?email=${encodeURIComponent(
-          user.email
+        `${API_URL}/api/dashboard/stats?email=${encodeURIComponent(
+          userEmail
         )}`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${
-              sessionStorage.getItem(
-                "rlearnhub_token"
-              ) || ""
-            }`,
-          },
+          headers: getAuthHeaders(),
         }
       );
 
       if (!response.ok) {
         throw new Error(
-          "Failed to load dashboard statistics."
+          `Failed to load statistics. Status: ${response.status}`
         );
       }
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       setStats({
-        resources:
-          data.resources ?? 0,
-
-        downloads:
-          data.downloads ?? 0,
-
-        subjects:
-          data.subjects ?? 0,
+        resources: Number(data?.resources ?? 0),
+        downloads: Number(data?.downloads ?? 0),
+        subjects: Number(data?.subjects ?? 0),
       });
 
+      setStatsError("");
     } catch (error) {
-      console.error(
-        "Dashboard statistics error:",
-        error
-      );
+      console.error("Dashboard statistics error:", error);
 
       setStats({
         resources: 0,
@@ -147,431 +205,134 @@ function Dashboard({
         subjects: 0,
       });
 
+      setStatsError(
+        error.message || "Unable to load dashboard statistics."
+      );
     } finally {
       setStatsLoading(false);
     }
-  };
+  }, [userEmail]);
 
+  // =======================================================
+  // LOAD RECENT APPROVED RESOURCES
+  // =======================================================
+  const loadRecentResources = useCallback(async () => {
+    setRecentResourcesLoading(true);
 
-  // ==========================================
-  // LOAD RECENT RESOURCES
-  // ==========================================
-
-  const loadRecentResources = async () => {
     try {
-      setRecentResourcesLoading(true);
-
-      const response = await fetch(
-        "http://localhost:8080/api/resources",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${
-              sessionStorage.getItem(
-                "rlearnhub_token"
-              ) || ""
-            }`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/resources`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
 
       if (!response.ok) {
         throw new Error(
-          "Failed to load recent resources."
+          `Failed to load resources. Status: ${response.status}`
         );
       }
 
-      const data =
-        await response.json();
+      const data = await response.json();
+      const resources = Array.isArray(data) ? data : [];
 
-      const recent = [...data]
-        .sort((a, b) => {
-          const dateA =
-            new Date(a.dateAdded || 0);
-
-          const dateB =
-            new Date(b.dateAdded || 0);
-
-          return dateB - dateA;
-        })
-        .slice(0, 3);
-
-      setRecentResources(recent);
-
-    } catch (error) {
-      console.error(
-        "Recent resources error:",
-        error
+      const approvedResources = resources.filter(
+        (resource) =>
+          String(resource?.status || "APPROVED").toUpperCase() ===
+          "APPROVED"
       );
 
-      setRecentResources([]);
+      approvedResources.sort((a, b) => {
+        const dateDifference =
+          getItemTimestamp(b) - getItemTimestamp(a);
 
+        return dateDifference || Number(b?.id || 0) - Number(a?.id || 0);
+      });
+
+      setRecentResources(approvedResources.slice(0, 3));
+    } catch (error) {
+      console.error("Recent resources error:", error);
+      setRecentResources([]);
     } finally {
       setRecentResourcesLoading(false);
     }
-  };
+  }, []);
 
-
-  // ==========================================
-  // LOAD DASHBOARD DATA
-  // ==========================================
-
-  useEffect(() => {
-    if (user?.email) {
-      loadDashboardStats();
-    }
-
-    loadRecentResources();
-  }, [user?.email]);
-
-
-  // ==========================================
-  // LOAD NOTIFICATIONS
-  // ==========================================
-
-  const loadNotifications = async () => {
-    if (!user?.email) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
+  // =======================================================
+  // LOAD LATEST ANNOUNCEMENTS
+  // =======================================================
+  const loadAnnouncements = useCallback(async () => {
+    setAnnouncementsLoading(true);
 
     try {
-      setNotificationLoading(true);
-
-      const token =
-        sessionStorage.getItem(
-          "rlearnhub_token"
-        ) || user?.token;
-
-      const headers = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers.Authorization =
-          `Bearer ${token}`;
-      }
-
-      const email =
-        encodeURIComponent(user.email);
-
-      // Load notification list and unread count
-      // at the same time.
-      const [
-        notificationsResponse,
-        unreadResponse,
-      ] = await Promise.all([
-        fetch(
-          `http://localhost:8080/api/notifications?email=${email}`,
-          {
-            method: "GET",
-            headers,
-          }
-        ),
-
-        fetch(
-          `http://localhost:8080/api/notifications/unread-count?email=${email}`,
-          {
-            method: "GET",
-            headers,
-          }
-        ),
-      ]);
-
-      if (!notificationsResponse.ok) {
-        throw new Error(
-          `Failed to load notifications. Status: ${notificationsResponse.status}`
-        );
-      }
-
-      if (!unreadResponse.ok) {
-        throw new Error(
-          `Failed to load unread count. Status: ${unreadResponse.status}`
-        );
-      }
-
-      const notificationData =
-        await notificationsResponse.json();
-
-      const unreadData =
-        await unreadResponse.json();
-
-      // ==========================================
-      // NEWEST NOTIFICATION FIRST
-      // ==========================================
-
-      const sortedNotifications =
-        Array.isArray(notificationData)
-          ? [...notificationData].sort(
-              (a, b) =>
-                Number(b.id) -
-                Number(a.id)
-            )
-          : [];
-
-      setNotifications(
-        sortedNotifications
-      );
-
-      // ==========================================
-      // BACKEND IS SOURCE OF TRUTH
-      // ==========================================
-
-      setUnreadCount(
-        Number(unreadData) || 0
-      );
-
-    } catch (error) {
-      console.error(
-        "Notification loading error:",
-        error
-      );
-
-    } finally {
-      setNotificationLoading(false);
-    }
-  };
-
-
-  // ==========================================
-  // LOAD NOTIFICATIONS WHEN DASHBOARD OPENS
-  // REFRESH EVERY 5 SECONDS
-  // ==========================================
-
-  useEffect(() => {
-    if (!user?.email) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
-
-    // Load immediately when dashboard opens
-    loadNotifications();
-
-    // Refresh every 5 seconds
-    const interval =
-      setInterval(() => {
-        loadNotifications();
-      }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [user?.email]);
-
-
-  // ==========================================
-  // MARK ONE NOTIFICATION AS READ
-  // ==========================================
-
-  const markNotificationAsRead = async (
-    notificationId
-  ) => {
-    try {
-      const response = await fetch(
-        `http://localhost:8080/api/notifications/${notificationId}/read`,
-        {
-          method: "PUT",
-          headers: {
-            ...getAuthHeaders(),
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/announcements`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
 
       if (!response.ok) {
         throw new Error(
-          "Failed to mark notification as read."
+          `Failed to load announcements. Status: ${response.status}`
         );
       }
 
-      // ==========================================
-      // UPDATE NOTIFICATION IMMEDIATELY
-      // ==========================================
+      const data = await response.json();
+      const announcementList = Array.isArray(data) ? data : [];
 
-      setNotifications(
-        (previousNotifications) =>
-          previousNotifications.map(
-            (notification) =>
-              Number(notification.id) ===
-              Number(notificationId)
-                ? {
-                    ...notification,
-                    readStatus: true,
-                  }
-                : notification
-          )
-      );
+      announcementList.sort((a, b) => {
+        const dateDifference =
+          getItemTimestamp(b) - getItemTimestamp(a);
 
-      // ==========================================
-      // GET REAL UNREAD COUNT FROM BACKEND
-      // ==========================================
+        return dateDifference || Number(b?.id || 0) - Number(a?.id || 0);
+      });
 
-      const token =
-        sessionStorage.getItem(
-          "rlearnhub_token"
-        ) || user?.token;
-
-      const unreadResponse =
-        await fetch(
-          `http://localhost:8080/api/notifications/unread-count?email=${encodeURIComponent(
-            user.email
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              ...(token
-                ? {
-                    Authorization:
-                      `Bearer ${token}`,
-                  }
-                : {}),
-            },
-          }
-        );
-
-      if (!unreadResponse.ok) {
-        throw new Error(
-          "Failed to reload unread count."
-        );
-      }
-
-      const unreadData =
-        await unreadResponse.json();
-
-      setUnreadCount(
-        Number(unreadData) || 0
-      );
-
+      setAnnouncements(announcementList.slice(0, 3));
     } catch (error) {
-      console.error(
-        "Mark notification error:",
-        error
-      );
-
-      // Reload from backend if something failed
-      loadNotifications();
+      console.error("Announcements error:", error);
+      setAnnouncements([]);
+    } finally {
+      setAnnouncementsLoading(false);
     }
-  };
+  }, []);
+  // =======================================================
+  // LOAD DASHBOARD DATA
+  // =======================================================
+  useEffect(() => {
+    let cancelled = false;
 
+    const loadDashboard = async () => {
+      if (cancelled) return;
 
-  // ==========================================
-  // MARK ALL NOTIFICATIONS AS READ
-  // ==========================================
+      await Promise.all([
+        loadRecentResources(),
+        loadAnnouncements(),
+        ...(userEmail ? [loadDashboardStats()] : []),
+      ]);
+    };
 
-  const markAllAsRead = async () => {
-    const unreadNotifications =
-      notifications.filter(
-        (notification) =>
-          notification.readStatus === false
-      );
-
-    if (
-      unreadNotifications.length === 0
-    ) {
-      setUnreadCount(0);
-      return;
-    }
-
-    try {
-      const responses =
-        await Promise.all(
-          unreadNotifications.map(
-            (notification) =>
-              fetch(
-                `http://localhost:8080/api/notifications/${notification.id}/read`,
-                {
-                  method: "PUT",
-                  headers: {
-                    ...getAuthHeaders(),
-                  },
-                }
-              )
-          )
-        );
-
-      const failed =
-        responses.some(
-          (response) =>
-            !response.ok
-        );
-
-      if (failed) {
-        throw new Error(
-          "Failed to mark all notifications as read."
-        );
+    const task = Promise.resolve().then(() => {
+      if (!cancelled) {
+        void loadDashboard();
       }
+    });
 
-      // ==========================================
-      // UPDATE ALL NOTIFICATIONS LOCALLY
-      // ==========================================
-
-      setNotifications(
-        (previousNotifications) =>
-          previousNotifications.map(
-            (notification) => ({
-              ...notification,
-              readStatus: true,
-            })
-          )
-      );
-
-      // ==========================================
-      // BELL COUNT = ZERO
-      // ==========================================
-
-      setUnreadCount(0);
-
-    } catch (error) {
-      console.error(
-        "Mark all notifications error:",
-        error
-      );
-
-      // Reload from database if something failed
-      loadNotifications();
-    }
-  };
-
-
-  // ==========================================
-  // NOTIFICATION ICON
-  // ==========================================
-
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "RESOURCE":
-        return "▣";
-
-      case "ANNOUNCEMENT":
-        return "!";
-
-      case "SYSTEM":
-        return "⚙";
-
-      default:
-        return "•";
-    }
-  };
-
-
-  // ==========================================
+    return () => {
+      cancelled = true;
+      void task;
+    };
+  }, [
+    userEmail,
+    loadDashboardStats,
+    loadRecentResources,
+    loadAnnouncements,
+  ]);
+  const isStatsLoading=statsLoading && Boolean(userEmail);
+  // =======================================================
   // PAGE
-  // ==========================================
-
+  // =======================================================
   return (
     <div className="dashboard-layout">
-
-      {/* ======================================
-          SIDEBAR
-      ====================================== */}
-
+      {/* SIDEBAR */}
       <aside className="dashboard-sidebar">
-
-        {/* BRAND */}
-
         <div className="sidebar-brand">
-
           <img
             src="/rosemont-hills-logo.png"
             alt="Rosemont Hills Montessori College Logo"
@@ -579,453 +340,141 @@ function Dashboard({
           />
 
           <div className="brand-text">
-
-            <h1>
-              RLearn Hub
-            </h1>
-
-            <p>
-              Resource Management
-            </p>
-
+            <h1>RLearn Hub</h1>
+            <p>Resource Management</p>
           </div>
-
         </div>
 
-
-        {/* USER INFORMATION */}
-
         <div className="sidebar-user">
-
           <div className="user-avatar">
-            {user?.name
-              ?.charAt(0)
-              ?.toUpperCase() || "U"}
+            {user?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
 
           <div className="user-details">
-
-            <strong>
-              {user?.name ||
-                user?.email ||
-                "User"}
-            </strong>
-
-            <span>
-              {user?.role ||
-                "STUDENT"}
-            </span>
-
+            <strong>{user?.name || userEmail || "User"}</strong>
+            <span>{userRole}</span>
           </div>
-
         </div>
-
-
-        {/* NAVIGATION */}
-
-        <nav className="dashboard-navigation">
-
+        <nav className="dashboard-navigation" aria-label="Main navigation">
           <button
             type="button"
             className="nav-item active"
+            aria-current="page"
           >
-            <span className="nav-icon">
-              ⌂
-            </span>
-
-            <span>
-              Dashboard
-            </span>
+            <span className="nav-icon">⌂</span>
+            <span>Dashboard</span>
           </button>
-
 
           <button
             type="button"
             className="nav-item"
             onClick={onBrowseResources}
           >
-            <span className="nav-icon">
-              ▣
-            </span>
-
-            <span>
-              Resource Library
-            </span>
-
+            <span className="nav-icon">▣</span>
+            <span>Resource Library</span>
           </button>
-
 
           <button
             type="button"
             className="nav-item"
             onClick={onAnnouncements}
           >
-            <span className="nav-icon">
-              ⚑
-            </span>
-
-            <span>
-              Announcements
-            </span>
-
+            <span className="nav-icon">⚑</span>
+            <span>Announcements</span>
           </button>
-
 
           {canManage && (
             <>
-
               <button
                 type="button"
                 className="nav-item"
                 onClick={onUploadResource}
               >
-                <span className="nav-icon">
-                  ↑
-                </span>
-
-                <span>
-                  Upload Resource
-                </span>
-
+                <span className="nav-icon">↑</span>
+                <span>Upload Resource</span>
               </button>
-
 
               <button
                 type="button"
                 className="nav-item"
                 onClick={onCreateAnnouncement}
               >
-                <span className="nav-icon">
-                  +
-                </span>
-
-                <span>
-                  Create Announcement
-                </span>
-
+                <span className="nav-icon">+</span>
+                <span>Create Announcement</span>
               </button>
-
             </>
           )}
-
         </nav>
-
-
-        {/* LOGOUT */}
-
         <button
           type="button"
           className="dashboard-logout"
           onClick={onLogout}
         >
-          <span className="logout-icon">
-            ↪
-          </span>
-
-          <span>
-            Logout
-          </span>
+          <span className="logout-icon">↪</span>
+          <span>Logout</span>
         </button>
-
       </aside>
-
-
-      {/* ======================================
-          MAIN CONTENT
-      ====================================== */}
-
+      {/* MAIN CONTENT */}
       <main className="dashboard-main">
-
-        {/* WELCOME HEADER */}
-
+        {/* WELCOME */}
         <section className="dashboard-welcome">
-
           <div>
-
             <span className="dashboard-label">
               ROSEMONT HILLS MONTESSORI COLLEGE
             </span>
 
             <h2>
-              Welcome back{" "}
-              <span>👋</span>
+              Welcome back <span>👋</span>
             </h2>
 
-            <p>
-              {user?.name ||
-                "Welcome to RLearn Hub"}
-            </p>
-
+            <p>{user?.name || "Welcome to RLearn Hub"}</p>
           </div>
-
-
-          {/* NOTIFICATION AREA */}
-
-          <div className="notification-wrapper">
-
-            <button
-              type="button"
-              className="notification-button"
-              onClick={() =>
-                setShowNotifications(
-                  (current) => !current
-                )
-              }
-              aria-label="Notifications"
-            >
-
-              <span className="notification-bell">
-                🔔
-              </span>
-
-              {unreadCount > 0 && (
-                <span className="notification-count">
-                  {unreadCount > 99
-                    ? "99+"
-                    : unreadCount}
-                </span>
-              )}
-
-            </button>
-
-
-            {/* NOTIFICATION DROPDOWN */}
-
-            {showNotifications && (
-              <div className="notification-dropdown">
-
-                <div className="notification-dropdown-header">
-
-                  <div>
-
-                    <h3>
-                      Notifications
-                    </h3>
-
-                    <span>
-                      {unreadCount} unread
-                    </span>
-
-                  </div>
-
-
-                  {unreadCount > 0 && (
-                    <button
-                      type="button"
-                      className="mark-all-read-button"
-                      onClick={
-                        markAllAsRead
-                      }
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-
-                </div>
-
-
-                {notificationLoading && (
-                  <div className="notification-status">
-                    Loading notifications...
-                  </div>
-                )}
-
-
-                {!notificationLoading &&
-                  notifications.length === 0 && (
-                    <div className="notification-status">
-
-                      <div className="empty-notification-icon">
-                        🔔
-                      </div>
-
-                      <strong>
-                        No notifications
-                      </strong>
-
-                      <span>
-                        You're all caught up!
-                      </span>
-
-                    </div>
-                  )}
-
-
-                {!notificationLoading &&
-                  notifications.length > 0 && (
-                    <div className="notification-list">
-
-                      {notifications.map(
-                        (notification) => (
-                          <div
-                            className={`notification-item ${
-                              notification.readStatus
-                                ? "read"
-                                : "unread"
-                            }`}
-                            key={
-                              notification.id
-                            }
-                            onClick={() => {
-                              if (
-                                !notification.readStatus
-                              ) {
-                                markNotificationAsRead(
-                                  notification.id
-                                );
-                              }
-                            }}
-                          >
-
-                            <div
-                              className={`notification-type-icon ${
-                                (
-                                  notification.type ||
-                                  ""
-                                ).toLowerCase()
-                              }`}
-                            >
-                              {getNotificationIcon(
-                                notification.type
-                              )}
-                            </div>
-
-
-                            <div className="notification-content">
-
-                              <strong>
-                                {
-                                  notification.title
-                                }
-                              </strong>
-
-                              <p>
-                                {
-                                  notification.message
-                                }
-                              </p>
-
-                              <span>
-                                {
-                                  notification.dateCreated
-                                }
-                              </span>
-
-                            </div>
-
-
-                            {!notification.readStatus && (
-                              <span className="notification-unread-dot">
-                                ●
-                              </span>
-                            )}
-
-                          </div>
-                        )
-                      )}
-
-                    </div>
-                  )}
-
-              </div>
-            )}
-
-          </div>
-
         </section>
-
 
         {/* STATISTICS */}
-
         <section className="dashboard-statistics">
-
           <div className="stat-card">
-
             <div className="stat-card-top">
-
-              <div className="stat-icon navy-icon">
-                ▤
-              </div>
-
+              <div className="stat-icon navy-icon">▤</div>
             </div>
 
-            <strong>
-              {statsLoading
-                ? "..."
-                : stats.resources}
-            </strong>
-
-            <span>
-              Resources Available
-            </span>
-
+            <strong>{isStatsLoading ? "..." : stats.resources}</strong>
+            <span>Resources Available</span>
           </div>
-
 
           <div className="stat-card">
-
             <div className="stat-card-top">
-
-              <div className="stat-icon gold-icon">
-                ↓
-              </div>
-
+              <div className="stat-icon gold-icon">↓</div>
             </div>
 
-            <strong>
-              {statsLoading
-                ? "..."
-                : stats.downloads}
-            </strong>
-
-            <span>
-              Downloaded
-            </span>
-
+            <strong>{isStatsLoading ? "..." : stats.downloads}</strong>
+            <span>Downloaded</span>
           </div>
-
 
           <div className="stat-card">
-
             <div className="stat-card-top">
-
-              <div className="stat-icon navy-icon">
-                ▦
-              </div>
-
+              <div className="stat-icon navy-icon">▦</div>
             </div>
 
-            <strong>
-              {statsLoading
-                ? "..."
-                : stats.subjects}
-            </strong>
-
-            <span>
-              Subjects
-            </span>
-
+            <strong>{isStatsLoading ? "..." : stats.subjects}</strong>
+            <span>Subjects</span>
           </div>
-
         </section>
 
+        {statsError && (
+          <div className="dashboard-error" role="alert">
+            {statsError}
+          </div>
+        )}
 
-        {/* RECENTLY ADDED RESOURCES */}
-
+        {/* RECENT RESOURCES */}
         <section className="dashboard-panel">
-
           <div className="panel-header">
-
             <div>
-
-              <h3>
-                Recently Added Resources
-              </h3>
-
+              <h3>Recently Added Resources</h3>
               <p>
-                Latest learning materials added to your library.
+                The 3 newest learning materials available in your library.
               </p>
-
             </div>
 
             <button
@@ -1035,89 +484,146 @@ function Dashboard({
             >
               View All →
             </button>
-
           </div>
 
-
           <div className="resource-list">
-
             {recentResourcesLoading && (
               <div className="resource-empty-state">
                 Loading recent resources...
               </div>
             )}
 
-
-            {!recentResourcesLoading &&
-              recentResources.length === 0 && (
-                <div className="resource-empty-state">
-                  No resources have been added yet.
-                </div>
-              )}
-
+            {!recentResourcesLoading && recentResources.length === 0 && (
+              <div className="resource-empty-state">
+                No resources have been added yet.
+              </div>
+            )}
 
             {!recentResourcesLoading &&
               recentResources.map((resource) => (
-                <div
-                  className="resource-row"
-                  key={resource.id}
-                >
-
+                <div className="resource-row" key={resource.id}>
                   <div className="resource-file-icon">
-
-                    <span>
-                      {resource.type
-                        ?.toUpperCase()
-                        .slice(0, 3) || "FILE"}
-                    </span>
-
+                    <span>{getResourceType(resource)}</span>
                   </div>
 
-
                   <div className="resource-information">
-
                     <strong>
-                      {resource.title}
+                      {resource.title || "Untitled Resource"}
                     </strong>
 
                     <span>
-                      {resource.subject} ·{" "}
-                      {resource.author} ·{" "}
-                      {resource.dateAdded}
+                      {resource.subject || "No subject"}
+                      {" · "}
+                      {resource.author || "Unknown author"}
+                      {" · "}
+                      {formatDate(
+                        resource.dateAdded ||
+                          resource.createdAt ||
+                          resource.dateCreated
+                      )}
                     </span>
-
                   </div>
 
-
                   <span
-                    className={`file-badge ${
-                      resource.type
-                        ?.toLowerCase() || ""
-                    }`}
+                    className={`file-badge ${String(resource.type || "file")
+                      .toLowerCase()
+                      .replace(/[^a-z0-9_-]/g, "")}`}
                   >
-                    {resource.type?.toUpperCase() ||
-                      "FILE"}
+                    {getResourceType(resource)}
                   </span>
-
                 </div>
               ))}
-
           </div>
-
         </section>
 
+        {/* ANNOUNCEMENTS */}
+        <section className="dashboard-panel">
+          <div className="panel-header">
+            <div>
+              <h3>Latest Announcements</h3>
+              <p>The 3 newest announcements from RLearn Hub.</p>
+            </div>
+
+            <button
+              type="button"
+              className="panel-action"
+              onClick={onAnnouncements}
+            >
+              View All →
+            </button>
+          </div>
+
+          <div className="announcement-list">
+            {announcementsLoading && (
+              <div className="resource-empty-state">
+                Loading announcements...
+              </div>
+            )}
+
+            {!announcementsLoading && announcements.length === 0 && (
+              <div className="resource-empty-state">
+                No announcements available.
+              </div>
+            )}
+
+            {!announcementsLoading &&
+              announcements.map((announcement) => {
+                const isNew = !viewedAnnouncementIds.includes(
+                  String(announcement.id)
+                );
+
+                return (
+                  <article
+                    className={`announcement-row ${
+                      isNew ? "announcement-row-latest" : ""
+                    }`}
+                    key={announcement.id}
+                    onClick={() =>
+                      markAnnouncementAsViewed(announcement.id)
+                    }
+                  >
+                    <div className="announcement-icon">!</div>
+
+                    <div className="announcement-information">
+                      <div className="announcement-title-row">
+                        <strong>
+                          {announcement.title || "Untitled Announcement"}
+                        </strong>
+
+                        {isNew && (
+                          <span className="announcement-new-badge">
+                            NEW
+                          </span>
+                        )}
+                      </div>
+
+                      <p>
+                        {announcement.message ||
+                          "No announcement message."}
+                      </p>
+
+                      <span>
+                        {announcement.author || "Administrator"}
+                        {" · "}
+                        {formatDate(
+                          announcement.datePosted ||
+                            announcement.date ||
+                            announcement.createdAt ||
+                            announcement.dateCreated
+                        )}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
+        </section>
 
         {/* FOOTER */}
-
         <footer className="dashboard-footer">
-
-          © 2026 RLearn Hub —
-          Rosemont Hills Montessori College
-
+          © 2026 RLearn Hub — Rosemont Hills Montessori College
         </footer>
-
       </main>
-
     </div>
   );
 }

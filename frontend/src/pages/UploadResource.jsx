@@ -1,6 +1,9 @@
 import { useState } from "react";
 import "./UploadResource.css";
 
+const API_URL = "http://localhost:8080";
+const SCHOOL_LOGO = "/rosemont-hills-logo.png";
+
 function UploadResource({ onBackToDashboard }) {
 
   // =========================================================
@@ -56,6 +59,20 @@ function UploadResource({ onBackToDashboard }) {
   const maxFileSize = 50 * 1024 * 1024;
 
   // =========================================================
+  // GET JWT TOKEN
+  // =========================================================
+
+  const getToken = () => {
+    const sessionToken =
+      sessionStorage.getItem("rlearnhub_token");
+
+    const localToken =
+      localStorage.getItem("rlearnhub_token");
+
+    return sessionToken || localToken;
+  };
+
+  // =========================================================
   // FILE SIZE FORMAT
   // =========================================================
 
@@ -68,7 +85,7 @@ function UploadResource({ onBackToDashboard }) {
   };
 
   // =========================================================
-  // FILE TYPE
+  // GET FILE EXTENSION
   // =========================================================
 
   const getFileExtension = (fileName) => {
@@ -88,9 +105,7 @@ function UploadResource({ onBackToDashboard }) {
   // =========================================================
 
   const getFileTypeLabel = (extension) => {
-
     switch (extension) {
-
       case "pdf":
         return "PDF Document";
 
@@ -119,9 +134,8 @@ function UploadResource({ onBackToDashboard }) {
   // =========================================================
 
   const handleFileChange = (event) => {
-
     const selectedFile =
-      event.target.files[0];
+      event.target.files?.[0];
 
     setSuccess("");
     setError("");
@@ -139,7 +153,6 @@ function UploadResource({ onBackToDashboard }) {
       getFileExtension(selectedFile.name);
 
     if (!allowedExtensions.includes(extension)) {
-
       setFile(null);
 
       event.target.value = "";
@@ -156,7 +169,6 @@ function UploadResource({ onBackToDashboard }) {
     // -------------------------------------------------------
 
     if (selectedFile.size > maxFileSize) {
-
       setFile(null);
 
       event.target.value = "";
@@ -180,26 +192,24 @@ function UploadResource({ onBackToDashboard }) {
   // =========================================================
 
   const handleUpload = async (event) => {
-
     event.preventDefault();
 
     setSuccess("");
     setError("");
 
     // -------------------------------------------------------
-    // CHECK REQUIRED FIELDS
+    // VALIDATE REQUIRED FIELDS
     // -------------------------------------------------------
 
     if (
       !title.trim() ||
-      !subject ||
+      !subject.trim() ||
       !topic.trim() ||
       !yearLevel ||
       !author.trim() ||
       !dateAdded ||
       !file
     ) {
-
       setError(
         "Please complete all fields and select a file."
       );
@@ -208,23 +218,18 @@ function UploadResource({ onBackToDashboard }) {
     }
 
     // -------------------------------------------------------
-    // CHECK FILE AGAIN
+    // VALIDATE FILE
     // -------------------------------------------------------
 
     const extension =
       getFileExtension(file.name);
 
     if (!allowedExtensions.includes(extension)) {
-
-      setError(
-        "Unsupported file type."
-      );
-
+      setError("Unsupported file type.");
       return;
     }
 
     if (file.size > maxFileSize) {
-
       setError(
         "File is too large. The maximum file size is 50 MB."
       );
@@ -232,16 +237,28 @@ function UploadResource({ onBackToDashboard }) {
       return;
     }
 
-    try {
+    // -------------------------------------------------------
+    // GET TOKEN
+    // -------------------------------------------------------
 
+    const token = getToken();
+
+    if (!token) {
+      setError(
+        "Your login session has expired. Please log in again."
+      );
+
+      return;
+    }
+
+    try {
       setUploading(true);
 
       // -----------------------------------------------------
       // CREATE FORM DATA
       // -----------------------------------------------------
 
-      const formData =
-        new FormData();
+      const formData = new FormData();
 
       formData.append(
         "file",
@@ -255,7 +272,7 @@ function UploadResource({ onBackToDashboard }) {
 
       formData.append(
         "subject",
-        subject
+        subject.trim()
       );
 
       formData.append(
@@ -279,33 +296,49 @@ function UploadResource({ onBackToDashboard }) {
       );
 
       // -----------------------------------------------------
-      // SEND TO SPRING BOOT
+      // DEBUG INFORMATION
       // -----------------------------------------------------
 
-          const token = sessionStorage.getItem("rlearnhub_token");
-
-      if (!token) {
-        throw new Error("Please log in again. Authentication token is missing.");
-      }
-      console.log("=== UPLOAD STARTED ===");
-      console.log("Title:", title);
-      console.log("Subject:", subject);
-      console.log("Topic:", topic);
+      console.log("=== RLEARN HUB RESOURCE UPLOAD ===");
+      console.log("Title:", title.trim());
+      console.log("Subject:", subject.trim());
+      console.log("Topic:", topic.trim());
       console.log("Year Level:", yearLevel);
-      console.log("Author:", author);
+      console.log("Author:", author.trim());
       console.log("Date Added:", dateAdded);
-      console.log("File:", file);
+      console.log("File:", file.name);
+      console.log("File Size:", formatFileSize(file.size));
+      console.log("File Type:", extension);
       console.log("Token exists:", !!token);
 
-            const response = await fetch(
-        "http://localhost:8080/api/resources/upload",
+      // -----------------------------------------------------
+      // SEND TO API GATEWAY
+      // -----------------------------------------------------
+
+      const response = await fetch(
+        `${API_URL}/api/resources/upload`,
         {
           method: "POST",
+
           headers: {
             Authorization: `Bearer ${token}`,
           },
+
           body: formData,
         }
+      );
+
+      // -----------------------------------------------------
+      // READ SERVER RESPONSE
+      // -----------------------------------------------------
+
+      const responseText =
+        await response.text();
+
+      console.log(
+        "Upload response:",
+        response.status,
+        responseText
       );
 
       // -----------------------------------------------------
@@ -313,35 +346,26 @@ function UploadResource({ onBackToDashboard }) {
       // -----------------------------------------------------
 
       if (!response.ok) {
-
-        let errorMessage =
-          "Unable to upload the resource.";
-
-        try {
-
-          const serverMessage =
-            await response.text();
-
-          if (serverMessage) {
-            errorMessage =
-              serverMessage;
-          }
-
-        } catch {
-          // Keep default error
-        }
-
         throw new Error(
-          errorMessage
+          responseText ||
+          `Unable to upload the resource. Status: ${response.status}`
         );
       }
 
       // -----------------------------------------------------
-      // GET UPLOADED RESOURCE
+      // PARSE RESPONSE
       // -----------------------------------------------------
 
-      const uploadedResource =
-        await response.json();
+      let uploadedResource = null;
+
+      if (responseText) {
+        try {
+          uploadedResource =
+            JSON.parse(responseText);
+        } catch {
+          uploadedResource = null;
+        }
+      }
 
       console.log(
         "Uploaded resource:",
@@ -361,16 +385,17 @@ function UploadResource({ onBackToDashboard }) {
       // -----------------------------------------------------
 
       setTitle("");
-      setSubject(
-        "Information Technology"
-      );
+      setSubject("");
       setTopic("");
       setYearLevel("First Year");
       setAuthor("");
       setDateAdded("");
       setFile(null);
 
-      // Reset file input
+      // -----------------------------------------------------
+      // RESET FILE INPUT
+      // -----------------------------------------------------
+
       const fileInput =
         document.getElementById(
           "resource-file"
@@ -380,22 +405,25 @@ function UploadResource({ onBackToDashboard }) {
         fileInput.value = "";
       }
 
-    } catch (uploadError) {
+      // Scroll to success message
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
 
+    } catch (uploadError) {
       console.error(
-        "Upload error:",
+        "Upload resource error:",
         uploadError
       );
 
       setError(
-        uploadError.message ||
+        uploadError?.message ||
         "Unable to upload the resource."
       );
 
     } finally {
-
       setUploading(false);
-
     }
   };
 
@@ -415,12 +443,13 @@ function UploadResource({ onBackToDashboard }) {
         <div className="upload-header-brand">
 
           <img
-            src="/rosemont-hills-logo.png"
+            src={SCHOOL_LOGO}
             alt="Rosemont Hills Montessori College Logo"
             className="upload-school-logo"
           />
 
-          <div>
+          <div className="upload-header-brand-text">
+
             <h1>
               RLearn Hub
             </h1>
@@ -428,19 +457,22 @@ function UploadResource({ onBackToDashboard }) {
             <p>
               Teacher Resource Management
             </p>
+
           </div>
 
         </div>
 
         <button
+          type="button"
           className="upload-back-button"
           onClick={onBackToDashboard}
-          type="button"
+          disabled={uploading}
         >
           ← Back to Dashboard
         </button>
 
       </header>
+
 
       {/* =====================================================
           MAIN
@@ -470,44 +502,52 @@ function UploadResource({ onBackToDashboard }) {
               </h2>
 
               <p>
-                Add a learning material to the RLearn Hub Resource Library.
+                Add a learning material to the
+                RLearn Hub Resource Library.
               </p>
 
             </div>
 
           </div>
 
+
           {/* =================================================
               SUCCESS MESSAGE
           ================================================= */}
 
           {success && (
-
-            <div className="upload-success-message">
+            <div
+              className="upload-success-message"
+              role="status"
+              aria-live="polite"
+            >
               ✓ {success}
             </div>
-
           )}
+
 
           {/* =================================================
               ERROR MESSAGE
           ================================================= */}
 
           {error && (
-
-            <div className="upload-error-message">
+            <div
+              className="upload-error-message"
+              role="alert"
+              aria-live="assertive"
+            >
               ⚠ {error}
             </div>
-
           )}
 
+
           {/* =================================================
-              FORM
+              FORM GRID
           ================================================= */}
 
           <div className="upload-form-grid">
 
-            {/* TITLE */}
+            {/* RESOURCE TITLE */}
 
             <div className="upload-form-group">
 
@@ -517,36 +557,43 @@ function UploadResource({ onBackToDashboard }) {
 
               <input
                 id="resource-title"
+                name="title"
                 type="text"
                 placeholder="Enter resource title"
                 value={title}
                 onChange={(event) =>
                   setTitle(event.target.value)
                 }
+                disabled={uploading}
+                required
               />
 
             </div>
 
-            {/* SUBJECT */}
 
+            {/* SUBJECT */}
 
             <div className="upload-form-group">
 
               <label htmlFor="resource-subject">
-              Subject
+                Subject
               </label>
 
               <input
                 id="resource-subject"
+                name="subject"
                 type="text"
                 placeholder="Enter subject"
                 value={subject}
                 onChange={(event) =>
                   setSubject(event.target.value)
                 }
+                disabled={uploading}
+                required
               />
 
             </div>
+
 
             {/* TOPIC */}
 
@@ -558,15 +605,19 @@ function UploadResource({ onBackToDashboard }) {
 
               <input
                 id="resource-topic"
+                name="topic"
                 type="text"
                 placeholder="Enter topic"
                 value={topic}
                 onChange={(event) =>
                   setTopic(event.target.value)
                 }
+                disabled={uploading}
+                required
               />
 
             </div>
+
 
             {/* YEAR LEVEL */}
 
@@ -578,51 +629,57 @@ function UploadResource({ onBackToDashboard }) {
 
               <select
                 id="resource-year"
+                name="yearLevel"
                 value={yearLevel}
                 onChange={(event) =>
                   setYearLevel(event.target.value)
                 }
+                disabled={uploading}
+                required
               >
-
-                <option>
+                <option value="First Year">
                   First Year
                 </option>
 
-                <option>
+                <option value="Second Year">
                   Second Year
                 </option>
 
-                <option>
+                <option value="Third Year">
                   Third Year
                 </option>
 
-                <option>
+                <option value="Fourth Year">
                   Fourth Year
                 </option>
-
               </select>
 
             </div>
 
-                    {/* INSTRUCTOR */}
 
-          <div className="upload-form-group">
+            {/* INSTRUCTOR */}
 
-            <label htmlFor="resource-author">
-              Instructor
-            </label>
+            <div className="upload-form-group">
 
-            <input
-              id="resource-author"
-              type="text"
-              placeholder="Enter instructor name"
-              value={author}
-              onChange={(event) =>
-                setAuthor(event.target.value)
-              }
-            />
+              <label htmlFor="resource-author">
+                Instructor
+              </label>
 
-          </div>
+              <input
+                id="resource-author"
+                name="author"
+                type="text"
+                placeholder="Enter instructor name"
+                value={author}
+                onChange={(event) =>
+                  setAuthor(event.target.value)
+                }
+                disabled={uploading}
+                required
+              />
+
+            </div>
+
 
             {/* DATE */}
 
@@ -634,16 +691,20 @@ function UploadResource({ onBackToDashboard }) {
 
               <input
                 id="resource-date"
+                name="dateAdded"
                 type="date"
                 value={dateAdded}
                 onChange={(event) =>
                   setDateAdded(event.target.value)
                 }
+                disabled={uploading}
+                required
               />
 
             </div>
 
           </div>
+
 
           {/* =================================================
               FILE UPLOAD
@@ -651,7 +712,7 @@ function UploadResource({ onBackToDashboard }) {
 
           <div className="upload-file-section">
 
-            <label>
+            <label htmlFor="resource-file">
               Learning Material
             </label>
 
@@ -662,7 +723,6 @@ function UploadResource({ onBackToDashboard }) {
               </div>
 
               {file ? (
-
                 <>
                   <h3>
                     {file.name}
@@ -672,30 +732,32 @@ function UploadResource({ onBackToDashboard }) {
                     {getFileTypeLabel(
                       getFileExtension(file.name)
                     )}
+
                     {" • "}
+
                     {formatFileSize(file.size)}
                   </p>
                 </>
-
               ) : (
-
                 <>
                   <h3>
                     Select a learning material
                   </h3>
 
                   <p>
-                    PDF, DOC, DOCX, PPT, PPTX, or video
+                    PDF, DOC, DOCX, PPT, PPTX,
+                    or video
                   </p>
                 </>
-
               )}
 
               <input
                 id="resource-file"
+                name="file"
                 type="file"
                 accept={allowedFileTypes}
                 onChange={handleFileChange}
+                disabled={uploading}
               />
 
               <label
@@ -704,18 +766,21 @@ function UploadResource({ onBackToDashboard }) {
               >
                 {file
                   ? "Choose Another File"
-                  : "Select File"
-                }
+                  : "Select File"}
               </label>
 
               <div className="file-upload-info">
 
                 <span>
-                  Maximum file size: <strong>50 MB</strong>
+                  Maximum file size:
+                  {" "}
+                  <strong>50 MB</strong>
                 </span>
 
                 <span>
-                  Accepted: PDF • DOC • DOCX • PPT • PPTX • Video
+                  Accepted:
+                  {" "}
+                  PDF • DOC • DOCX • PPT • PPTX • Video
                 </span>
 
               </div>
@@ -723,6 +788,7 @@ function UploadResource({ onBackToDashboard }) {
             </div>
 
           </div>
+
 
           {/* =================================================
               ACTIONS
@@ -742,14 +808,19 @@ function UploadResource({ onBackToDashboard }) {
             <button
               type="submit"
               className="upload-submit-button"
-              disabled={uploading}
+              disabled={
+                uploading ||
+                !title.trim() ||
+                !subject.trim() ||
+                !topic.trim() ||
+                !author.trim() ||
+                !dateAdded ||
+                !file
+              }
             >
-
               {uploading
                 ? "Uploading..."
-                : "Upload Resource"
-              }
-
+                : "Upload Resource"}
             </button>
 
           </div>
@@ -758,14 +829,13 @@ function UploadResource({ onBackToDashboard }) {
 
       </main>
 
+
       {/* =====================================================
           FOOTER
       ===================================================== */}
 
       <footer className="upload-resource-footer">
-
         © 2026 RLearn Hub — Rosemont Hills Montessori College
-
       </footer>
 
     </div>

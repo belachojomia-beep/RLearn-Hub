@@ -1,40 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import "./Resources.css";
 import ResourceDetails from "./ResourceDetails";
 
 const API_URL = "http://localhost:8080";
+const SCHOOL_LOGO = "/rosemont-hills-logo.png";
 
 /* =========================================================
    AUTHENTICATION
-   ========================================================= */
+========================================================= */
 
 const getToken = () => {
-  /*
-   * Your screenshot shows rlearnhub_token inside
-   * SESSION STORAGE.
-   *
-   * We check sessionStorage FIRST.
-   * localStorage is also checked as a fallback.
-   */
-
-  const sessionToken =
-    sessionStorage.getItem("rlearnhub_token");
-
-  const localToken =
-    localStorage.getItem("rlearnhub_token");
-
   const token =
-    sessionToken || localToken;
-
-  console.log(
-    "JWT exists:",
-    !!token
-  );
-
-  console.log(
-    "JWT length:",
-    token?.length || 0
-  );
+    sessionStorage.getItem("rlearnhub_token") ||
+    localStorage.getItem("rlearnhub_token");
 
   if (!token) {
     throw new Error(
@@ -45,1352 +29,874 @@ const getToken = () => {
   return token;
 };
 
+const getAuthHeaders = (accept = "application/json") => ({
+  Authorization: `Bearer ${getToken()}`,
+  Accept: accept,
+});
 
 /* =========================================================
-   AUTH HEADERS
-   ========================================================= */
+   API ERROR HANDLING
+========================================================= */
 
-const getAuthHeaders = () => {
-  const token = getToken();
+const getErrorMessage = async (response, defaultMessage) => {
+  let message = `${defaultMessage} Status: ${response.status}`;
 
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  try {
+    const contentType = response.headers.get("content-type");
+
+    if (contentType?.includes("application/json")) {
+      const data = await response.json();
+
+      message =
+        data?.message ||
+        data?.error ||
+        data?.detail ||
+        message;
+    } else {
+      const responseText = await response.text();
+
+      if (responseText) {
+        message = responseText;
+      }
+    }
+  } catch {
+    // Keep the default error message.
+  }
+
+  return message;
 };
 
+/* =========================================================
+   RESOURCE HELPERS
+========================================================= */
+
+const getResourceType = (resource) => {
+  const value =
+    resource?.type ||
+    resource?.fileType ||
+    resource?.fileName?.split(".").pop() ||
+    "FILE";
+
+  return value
+    .toString()
+    .replace(/^\./, "")
+    .toUpperCase();
+};
+
+const getResourceDate = (resource) =>
+  resource?.dateAdded ||
+  resource?.createdAt ||
+  resource?.date ||
+  resource?.dateCreated ||
+  null;
+
+const getDateTimestamp = (resource) => {
+  const value = getResourceDate(resource);
+
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const formatDate = (value) => {
+  if (!value) {
+    return "Date not available";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value.toString();
+  }
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+const normalizeResourceList = (data) => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.content)) {
+    return data.content;
+  }
+
+  if (Array.isArray(data?.resources)) {
+    return data.resources;
+  }
+
+  return [];
+};
 
 /* =========================================================
-   COMPONENT
-   ========================================================= */
+   RESOURCES COMPONENT
+========================================================= */
 
-function Resources({
-  user,
-  onBackToDashboard
-}) {
-
+function Resources({ user, onBackToDashboard }) {
   /* =======================================================
      FILTER STATES
-     ======================================================= */
+  ======================================================= */
 
-  const [search, setSearch] =
-    useState("");
-
-  const [subject, setSubject] =
-    useState("All Subjects");
-
-  const [yearLevel, setYearLevel] =
-    useState("All Year Levels");
-
-  const [topic, setTopic] =
-    useState("All Topics");
-
+  const [search, setSearch] = useState("");
+  const [subject, setSubject] = useState("All Subjects");
+  const [yearLevel, setYearLevel] = useState("All Year Levels");
+  const [topic, setTopic] = useState("All Topics");
 
   /* =======================================================
      RESOURCE STATES
-     ======================================================= */
+  ======================================================= */
 
-  const [resources, setResources] =
-    useState([]);
-
-  const [selectedResource, setSelectedResource] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [deletingId, setDeletingId] =
-    useState(null);
-
-  const [downloadingId, setDownloadingId] =
-    useState(null);
-
+  const [resources, setResources] = useState([]);
+  const [selectedResource, setSelectedResource] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   /* =======================================================
      USER ROLE
-     ======================================================= */
+  ======================================================= */
 
-  const userRole =
-    user?.role?.toString().toUpperCase();
+  const userRole = user?.role?.toString().toUpperCase();
 
-  const isTeacher =
-    userRole === "TEACHER";
+  const isStudent = userRole === "STUDENT";
+  const isTeacher = userRole === "TEACHER";
+  const isAdmin = userRole === "ADMIN";
 
-  const isAdmin =
-    userRole === "ADMIN";
-
-  const canDelete =
-    isTeacher || isAdmin;
-
+  const canDelete = isTeacher || isAdmin;
 
   /* =======================================================
      LOAD RESOURCES
-     ======================================================= */
 
-  const loadResources = async () => {
+     All requests go through API Gateway :8080.
+     Students can only see approved resources.
+  ======================================================= */
 
-    try {
-
-      setLoading(true);
-      setError("");
-
-      console.log(
-        "Loading resources..."
-      );
-
-      const headers =
-        getAuthHeaders();
-
-      const response =
-        await fetch(
+  const loadResources = useCallback(
+    async (signal) => {
+      try {
+        const response = await fetch(
           `${API_URL}/api/resources`,
           {
             method: "GET",
-            headers: {
-              ...headers,
-              Accept:
-                "application/json",
-            },
+            headers: getAuthHeaders(),
+            signal,
           }
         );
 
-      console.log(
-        "Resources response:",
-        response.status
-      );
-
-      if (!response.ok) {
-
-        let message =
-          `Failed to load resources. Status: ${response.status}`;
-
-        try {
-
-          const contentType =
-            response.headers.get(
-              "content-type"
-            );
-
-          if (
-            contentType?.includes(
-              "application/json"
+        if (!response.ok) {
+          throw new Error(
+            await getErrorMessage(
+              response,
+              "Failed to load resources."
             )
-          ) {
-
-            const errorData =
-              await response.json();
-
-            if (
-              errorData?.message
-            ) {
-              message =
-                errorData.message;
-            }
-
-          } else {
-
-            const text =
-              await response.text();
-
-            if (text) {
-              message = text;
-            }
-          }
-
-        } catch {
-          // Keep default error
+          );
         }
 
-        throw new Error(message);
-      }
+        const data = await response.json();
 
+        let resourceData = normalizeResourceList(data);
 
-      const data =
-        await response.json();
+        if (isStudent) {
+          resourceData = resourceData.filter(
+            (resource) =>
+              resource?.status?.toString().toUpperCase() ===
+              "APPROVED"
+          );
+        }
 
-      console.log(
-        "Resources received:",
-        data
-      );
-
-
-      if (Array.isArray(data)) {
-
-        setResources(data);
-
-      } else if (
-        Array.isArray(data?.content)
-      ) {
-
-        /*
-         * Supports Spring Boot Page response
-         * if the backend returns:
-         *
-         * {
-         *   content: [...]
-         * }
-         */
-
-        setResources(
-          data.content
+        resourceData.sort(
+          (a, b) =>
+            getDateTimestamp(b) - getDateTimestamp(a)
         );
 
-      } else {
+        setResources(resourceData);
+        setError("");
+      } catch (loadError) {
+        if (
+          loadError?.name === "AbortError"
+        ) {
+          return;
+        }
+
+        console.error("Error loading resources:", loadError);
 
         setResources([]);
+        setError(
+          loadError?.message ||
+            "Unable to load resources from the server."
+        );
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-
-    } catch (error) {
-
-      console.error(
-        "Error loading resources:",
-        error
-      );
-
-      setResources([]);
-
-      setError(
-        error?.message ||
-        "Unable to load resources from the server."
-      );
-
-    } finally {
-
-      setLoading(false);
-    }
-  };
-
+    },
+    [isStudent]
+  );
 
   /* =======================================================
-     LOAD ON PAGE OPEN
-     ======================================================= */
+     LOAD WHEN PAGE OPENS
+
+     Defer the initial call to avoid triggering the
+     set-state-in-effect lint rule.
+  ======================================================= */
 
   useEffect(() => {
+    const controller = new AbortController();
 
-    loadResources();
+    Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadResources(controller.signal);
+      }
+    });
 
-  }, []);
+    return () => {
+      controller.abort();
+    };
+  }, [loadResources]);
 
+  /* =======================================================
+     RETRY LOADING
+  ======================================================= */
+
+  const handleRetry = useCallback(async () => {
+    const controller = new AbortController();
+
+    setLoading(true);
+    setError("");
+
+    await loadResources(controller.signal);
+  }, [loadResources]);
 
   /* =======================================================
      SUBJECT OPTIONS
-     ======================================================= */
+  ======================================================= */
 
-  const subjectOptions =
-    useMemo(() => {
+  const subjectOptions = useMemo(() => {
+    const values = resources
+      .map((resource) => resource?.subject)
+      .filter(Boolean)
+      .map((value) => value.toString());
 
-      const values =
-        resources
-          .map(
-            resource =>
-              resource?.subject
-          )
-          .filter(Boolean);
-
-      return [
-        ...new Set(values)
-      ].sort();
-
-    }, [resources]);
-
+    return [...new Set(values)].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [resources]);
 
   /* =======================================================
      YEAR LEVEL OPTIONS
-     ======================================================= */
+  ======================================================= */
 
-  const yearLevelOptions =
-    useMemo(() => {
+  const yearLevelOptions = useMemo(() => {
+    const values = resources
+      .map((resource) => resource?.yearLevel)
+      .filter(Boolean)
+      .map((value) => value.toString());
 
-      const values =
-        resources
-          .map(
-            resource =>
-              resource?.yearLevel
-          )
-          .filter(Boolean);
-
-      return [
-        ...new Set(values)
-      ].sort();
-
-    }, [resources]);
-
+    return [...new Set(values)].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [resources]);
 
   /* =======================================================
      TOPIC OPTIONS
-     ======================================================= */
+  ======================================================= */
 
-  const topicOptions =
-    useMemo(() => {
+  const topicOptions = useMemo(() => {
+    const values = resources
+      .map((resource) => resource?.topic)
+      .filter(Boolean)
+      .map((value) => value.toString());
 
-      const values =
-        resources
-          .map(
-            resource =>
-              resource?.topic
-          )
-          .filter(Boolean);
-
-      return [
-        ...new Set(values)
-      ].sort();
-
-    }, [resources]);
-
+    return [...new Set(values)].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [resources]);
 
   /* =======================================================
      FILTER RESOURCES
-     ======================================================= */
-
-  const filteredResources =
-    resources.filter(
-      resource => {
-
-        const searchText =
-          search
-            .trim()
-            .toLowerCase();
-
-
-        const title =
-          resource?.title
-            ?.toString()
-            .toLowerCase() || "";
-
-
-        const resourceSubject =
-          resource?.subject
-            ?.toString()
-            .toLowerCase() || "";
-
-
-        const resourceTopic =
-          resource?.topic
-            ?.toString()
-            .toLowerCase() || "";
-
-
-        const resourceAuthor =
-          resource?.author
-            ?.toString()
-            .toLowerCase() || "";
-
-
-        const matchesSearch =
-          searchText === "" ||
-          title.includes(searchText) ||
-          resourceSubject.includes(
-            searchText
-          ) ||
-          resourceTopic.includes(
-            searchText
-          ) ||
-          resourceAuthor.includes(
-            searchText
-          );
-
-
-        const matchesSubject =
-          subject === "All Subjects" ||
-          resource?.subject === subject;
-
-
-        const matchesYear =
-          yearLevel === "All Year Levels" ||
-          resource?.yearLevel ===
-            yearLevel;
-
-
-        const matchesTopic =
-          topic === "All Topics" ||
-          resource?.topic === topic;
-
-
-        return (
-          matchesSearch &&
-          matchesSubject &&
-          matchesYear &&
-          matchesTopic
-        );
-      }
-    );
-
-
-  /* =======================================================
-     DOWNLOAD RESOURCE
-     ======================================================= */
-
-  const handleDownload =
-    async resource => {
-
-      if (!resource?.id) {
-
-        alert(
-          "This resource does not have a valid ID."
-        );
-
-        return;
-      }
-
-
-      if (!user?.email) {
-
-        alert(
-          "Your account information is missing. Please log in again."
-        );
-
-        return;
-      }
-
-
-      try {
-
-        setDownloadingId(
-          resource.id
-        );
-
-
-        const token =
-          getToken();
-
-
-        const downloadUrl =
-          `${API_URL}/api/resources/${resource.id}/download?email=${encodeURIComponent(
-            user.email
-          )}`;
-
-
-        console.log(
-          "Downloading:",
-          downloadUrl
-        );
-
-
-        const response =
-          await fetch(
-            downloadUrl,
-            {
-              method: "GET",
-
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-
-                Accept:
-                  "*/*",
-              },
-            }
-          );
-
-
-        console.log(
-          "Download response:",
-          response.status
-        );
-
-
-        if (!response.ok) {
-
-          let message =
-            `Download failed. Status: ${response.status}`;
-
-
-          try {
-
-            const contentType =
-              response.headers.get(
-                "content-type"
-              );
-
-
-            if (
-              contentType?.includes(
-                "application/json"
-              )
-            ) {
-
-              const errorData =
-                await response.json();
-
-              if (
-                errorData?.message
-              ) {
-
-                message =
-                  errorData.message;
-              }
-
-            } else {
-
-              const text =
-                await response.text();
-
-              if (text) {
-                message = text;
-              }
-            }
-
-          } catch {
-            // Keep default message
-          }
-
-
-          throw new Error(message);
-        }
-
-
-        const blob =
-          await response.blob();
-
-
-        /*
-         * Try to get filename from backend.
-         */
-
-        let fileName =
-          resource?.fileName ||
-          resource?.title ||
-          "resource";
-
-
-        const contentDisposition =
-          response.headers.get(
-            "Content-Disposition"
-          );
-
-
-        if (
-          contentDisposition
-        ) {
-
-          const match =
-            contentDisposition.match(
-              /filename\*=(?:UTF-8'')?([^;]+)|filename="?([^"]+)"?/i
-            );
-
-
-          if (match) {
-
-            const rawFileName =
-              match[1] ||
-              match[2];
-
-
-            if (rawFileName) {
-
-              try {
-
-                fileName =
-                  decodeURIComponent(
-                    rawFileName
-                      .trim()
-                      .replace(
-                        /^["']|["']$/g,
-                        ""
-                      )
-                  );
-
-              } catch {
-
-                fileName =
-                  rawFileName
-                    .trim()
-                    .replace(
-                      /^["']|["']$/g,
-                      ""
-                    );
-              }
-            }
-          }
-        }
-
-
-        /*
-         * Add extension if necessary.
-         */
-
-        if (
-          !fileName.includes(".") &&
-          resource?.type
-        ) {
-
-          fileName =
-            `${fileName}.${resource.type
-              .toString()
-              .toLowerCase()}`;
-        }
-
-
-        /*
-         * Create download URL.
-         */
-
-        const blobUrl =
-          window.URL.createObjectURL(
-            blob
-          );
-
-
-        const link =
-          document.createElement(
-            "a"
-          );
-
-
-        link.href =
-          blobUrl;
-
-        link.download =
-          fileName;
-
-        link.style.display =
-          "none";
-
-
-        document.body.appendChild(
-          link
-        );
-
-
-        link.click();
-
-
-        document.body.removeChild(
-          link
-        );
-
-
-        setTimeout(() => {
-
-          window.URL.revokeObjectURL(
-            blobUrl
-          );
-
-        }, 1000);
-
-
-      } catch (error) {
-
-        console.error(
-          "Download resource error:",
-          error
-        );
-
-
-        alert(
-          error?.message ||
-          "Unable to download this resource."
-        );
-
-      } finally {
-
-        setDownloadingId(
-          null
-        );
-      }
-    };
-
-
-  /* =======================================================
-     DELETE RESOURCE
-     ======================================================= */
-
-  const handleDelete =
-    async resource => {
-
-      if (!resource?.id) {
-
-        alert(
-          "This resource does not have a valid ID."
-        );
-
-        return;
-      }
-
-
-      const confirmed =
-        window.confirm(
-          `Are you sure you want to delete "${resource.title}"?\n\nThis action cannot be undone.`
-        );
-
-
-      if (!confirmed) {
-        return;
-      }
-
-
-      try {
-
-        setDeletingId(
-          resource.id
-        );
-
-
-        const headers =
-          getAuthHeaders();
-
-
-        const response =
-          await fetch(
-            `${API_URL}/api/resources/${resource.id}`,
-            {
-              method: "DELETE",
-              headers,
-            }
-          );
-
-
-        if (!response.ok) {
-
-          let message =
-            `Failed to delete resource. Status: ${response.status}`;
-
-
-          try {
-
-            const data =
-              await response.json();
-
-            if (data?.message) {
-              message =
-                data.message;
-            }
-
-          } catch {
-            // Keep default
-          }
-
-
-          throw new Error(message);
-        }
-
-
-        setResources(
-          currentResources =>
-            currentResources.filter(
-              item =>
-                item.id !==
-                resource.id
-            )
-        );
-
-
-        if (
-          selectedResource?.id ===
-          resource.id
-        ) {
-
-          setSelectedResource(
-            null
-          );
-        }
-
-
-        alert(
-          `"${resource.title}" was deleted successfully.`
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Delete resource error:",
-          error
-        );
-
-
-        alert(
-          error?.message ||
-          "Unable to delete this resource."
-        );
-
-
-      } finally {
-
-        setDeletingId(
-          null
-        );
-      }
-    };
-
+  ======================================================= */
+
+  const filteredResources = useMemo(() => {
+    const searchText = search.trim().toLowerCase();
+
+    return resources.filter((resource) => {
+      const title =
+        resource?.title?.toString().toLowerCase() || "";
+
+      const resourceSubject =
+        resource?.subject?.toString().toLowerCase() || "";
+
+      const resourceTopic =
+        resource?.topic?.toString().toLowerCase() || "";
+
+      const resourceAuthor =
+        resource?.author?.toString().toLowerCase() || "";
+
+      const matchesSearch =
+        !searchText ||
+        title.includes(searchText) ||
+        resourceSubject.includes(searchText) ||
+        resourceTopic.includes(searchText) ||
+        resourceAuthor.includes(searchText);
+
+      const matchesSubject =
+        subject === "All Subjects" ||
+        resource?.subject?.toString() === subject;
+
+      const matchesYear =
+        yearLevel === "All Year Levels" ||
+        resource?.yearLevel?.toString() === yearLevel;
+
+      const matchesTopic =
+        topic === "All Topics" ||
+        resource?.topic?.toString() === topic;
+
+      return (
+        matchesSearch &&
+        matchesSubject &&
+        matchesYear &&
+        matchesTopic
+      );
+    });
+  }, [resources, search, subject, yearLevel, topic]);
 
   /* =======================================================
      CLEAR FILTERS
-     ======================================================= */
+  ======================================================= */
 
-  const handleClearFilters =
-    () => {
+  const handleClearFilters = useCallback(() => {
+    setSearch("");
+    setSubject("All Subjects");
+    setYearLevel("All Year Levels");
+    setTopic("All Topics");
+  }, []);
 
-      setSearch("");
-      setSubject("All Subjects");
-      setYearLevel(
-        "All Year Levels"
+  /* =======================================================
+     DOWNLOAD RESOURCE
+  ======================================================= */
+
+  const handleDownload = async (resource) => {
+    if (!resource?.id) {
+      window.alert("This resource does not have a valid ID.");
+      return;
+    }
+
+    if (!user?.email) {
+      window.alert(
+        "Your account information is missing. Please log in again."
       );
-      setTopic("All Topics");
-    };
+      return;
+    }
 
+    try {
+      setDownloadingId(resource.id);
+
+      const downloadUrl =
+        `${API_URL}/api/resources/${resource.id}/download` +
+        `?email=${encodeURIComponent(user.email)}`;
+
+      const response = await fetch(downloadUrl, {
+        method: "GET",
+        headers: getAuthHeaders("*/*"),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getErrorMessage(
+            response,
+            "Download failed."
+          )
+        );
+      }
+
+      const blob = await response.blob();
+
+      let fileName =
+        resource?.fileName ||
+        resource?.title ||
+        "resource";
+
+      const contentDisposition =
+        response.headers.get("Content-Disposition");
+
+      if (contentDisposition) {
+        const match = contentDisposition.match(
+          /filename\*=(?:UTF-8'')?([^;]+)|filename="?([^";]+)"?/i
+        );
+
+        if (match) {
+          const rawFileName = (match[1] || match[2])
+            ?.trim()
+            .replace(/^["']|["']$/g, "");
+
+          if (rawFileName) {
+            try {
+              fileName = decodeURIComponent(rawFileName);
+            } catch {
+              fileName = rawFileName;
+            }
+          }
+        }
+      }
+
+      const resourceType =
+        getResourceType(resource).toLowerCase();
+
+      if (
+        !fileName.toString().includes(".") &&
+        resourceType &&
+        resourceType !== "file"
+      ) {
+        fileName = `${fileName}.${resourceType}`;
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = blobUrl;
+      link.download = fileName;
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    } catch (downloadError) {
+      console.error(
+        "Download resource error:",
+        downloadError
+      );
+
+      window.alert(
+        downloadError?.message ||
+          "Unable to download this resource."
+      );
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  /* =======================================================
+     DELETE RESOURCE
+
+     Teachers and admins can delete resources.
+  ======================================================= */
+
+  const handleDelete = async (resource) => {
+    if (!canDelete) {
+      window.alert(
+        "You do not have permission to delete resources."
+      );
+      return;
+    }
+
+    if (!resource?.id) {
+      window.alert("This resource does not have a valid ID.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${resource.title || "this resource"}"?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(resource.id);
+
+      const response = await fetch(
+        `${API_URL}/api/resources/${resource.id}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await getErrorMessage(
+            response,
+            "Failed to delete resource."
+          )
+        );
+      }
+
+      setResources((currentResources) =>
+        currentResources.filter(
+          (item) => item.id !== resource.id
+        )
+      );
+
+      setSelectedResource((currentResource) =>
+        currentResource?.id === resource.id
+          ? null
+          : currentResource
+      );
+
+      window.alert(
+        `"${resource.title || "Resource"}" was deleted successfully.`
+      );
+    } catch (deleteError) {
+      console.error(
+        "Delete resource error:",
+        deleteError
+      );
+
+      window.alert(
+        deleteError?.message ||
+          "Unable to delete this resource."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   /* =======================================================
      RESOURCE DETAILS
-     ======================================================= */
+  ======================================================= */
 
   if (selectedResource) {
-
     return (
       <ResourceDetails
-        resource={
-          selectedResource
-        }
-
+        resource={selectedResource}
         user={user}
-
-        onBackToResources={() => {
-          setSelectedResource(
-            null
-          );
-        }}
+        onBackToResources={() => setSelectedResource(null)}
       />
     );
   }
 
-
   /* =======================================================
-     MAIN PAGE
-     ======================================================= */
+     MAIN RESOURCE LIBRARY PAGE
+  ======================================================= */
 
   return (
     <div className="resources-page">
-
-
-      {/* ===================================================
-          HEADER
-          =================================================== */}
-
       <header className="resources-header">
-
         <div className="resources-header-brand">
-
           <img
-            src="/rosemont-hills-logo.png"
+            src={SCHOOL_LOGO}
             alt="Rosemont Hills Montessori College Logo"
             className="resources-logo"
           />
 
-          <div>
-
-            <h1>
-              Resource Library
-            </h1>
-
-            <p>
-              Find learning materials,
-              resources, and study materials.
-            </p>
-
+          <div className="resources-brand-text">
+            <h1>RLearn Hub</h1>
+            <p>Resource Library</p>
           </div>
-
         </div>
-
 
         <button
           type="button"
           className="resources-back-button"
-          onClick={
-            onBackToDashboard
-          }
+          onClick={onBackToDashboard}
         >
           ← Back to Dashboard
         </button>
-
       </header>
 
+      <main className="resources-content">
+        <section className="resources-title-section">
+          <span className="resources-label">RLEARN HUB</span>
+          <h2>Resource Library</h2>
+          <p>
+            Find learning materials, resources, and study materials.
+          </p>
+        </section>
 
-      {/* ===================================================
-          FILTERS
-          =================================================== */}
+        {/* SEARCH AND FILTERS */}
 
-      <section className="resource-filters">
+        <section className="resource-filters">
+          <div className="resource-search">
+            <span className="search-icon" aria-hidden="true">
+              🔎
+            </span>
 
-
-        {/* SEARCH */}
-
-        <div className="resource-search">
-
-          <span className="search-icon">
-            🔎
-          </span>
-
-
-          <input
-            type="text"
-            placeholder="Search resources..."
-            value={search}
-            onChange={event =>
-              setSearch(
-                event.target.value
-              )
-            }
-          />
-
-        </div>
-
-
-        {/* SUBJECT */}
-
-        <select
-          value={subject}
-          onChange={event =>
-            setSubject(
-              event.target.value
-            )
-          }
-        >
-
-          <option value="All Subjects">
-            All Subjects
-          </option>
-
-
-          {subjectOptions.map(
-            option => (
-
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-
-            )
-          )}
-
-        </select>
-
-
-        {/* YEAR LEVEL */}
-
-        <select
-          value={yearLevel}
-          onChange={event =>
-            setYearLevel(
-              event.target.value
-            )
-          }
-        >
-
-          <option value="All Year Levels">
-            All Year Levels
-          </option>
-
-
-          {yearLevelOptions.map(
-            option => (
-
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-
-            )
-          )}
-
-        </select>
-
-
-        {/* TOPIC */}
-
-        <select
-          value={topic}
-          onChange={event =>
-            setTopic(
-              event.target.value
-            )
-          }
-        >
-
-          <option value="All Topics">
-            All Topics
-          </option>
-
-
-          {topicOptions.map(
-            option => (
-
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-
-            )
-          )}
-
-        </select>
-
-      </section>
-
-
-      {/* ===================================================
-          SUMMARY
-          =================================================== */}
-
-      <div className="resource-summary">
-
-        <div className="resource-count">
-
-          <strong>
-            {filteredResources.length}
-          </strong>
-
-          <span>
-            resources found
-          </span>
-
-        </div>
-
-
-        <button
-          type="button"
-          className="clear-filters"
-          onClick={
-            handleClearFilters
-          }
-        >
-          Clear Filters
-        </button>
-
-      </div>
-
-
-      {/* ===================================================
-          LOADING
-          =================================================== */}
-
-      {loading && (
-
-        <div className="no-resources">
-
-          <div className="empty-icon">
-            ⏳
+            <input
+              type="text"
+              placeholder="Search resources..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              aria-label="Search resources"
+            />
           </div>
 
-          <h2>
-            Loading resources...
-          </h2>
+          <select
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            aria-label="Filter by subject"
+          >
+            <option value="All Subjects">All Subjects</option>
 
-          <p>
-            Please wait while the
-            Resource Library loads.
-          </p>
+            {subjectOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
-        </div>
+          <select
+            value={yearLevel}
+            onChange={(event) => setYearLevel(event.target.value)}
+            aria-label="Filter by year level"
+          >
+            <option value="All Year Levels">
+              All Year Levels
+            </option>
 
-      )}
+            {yearLevelOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
+          <select
+            value={topic}
+            onChange={(event) => setTopic(event.target.value)}
+            aria-label="Filter by topic"
+          >
+            <option value="All Topics">All Topics</option>
 
-      {/* ===================================================
-          ERROR
-          =================================================== */}
+            {topicOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </section>
 
-      {!loading && error && (
+        {/* RESOURCE COUNT */}
 
-        <div className="no-resources">
+        <div className="resource-summary">
+          <div className="resource-count">
+            <strong>{filteredResources.length}</strong>
 
-          <div className="empty-icon">
-            ⚠️
+            <span>
+              {filteredResources.length === 1
+                ? "resource found"
+                : "resources found"}
+            </span>
           </div>
-
-          <h2>
-            Unable to Load Resources
-          </h2>
-
-          <p>
-            {error}
-          </p>
-
 
           <button
             type="button"
-            className="retry-button"
-            onClick={
-              loadResources
-            }
+            className="clear-filters"
+            onClick={handleClearFilters}
           >
-            Try Again
+            Clear Filters
           </button>
-
         </div>
 
-      )}
+        {/* LOADING STATE */}
 
+        {loading && (
+          <div className="no-resources">
+            <div className="empty-icon">⏳</div>
+            <h2>Loading resources...</h2>
+            <p>
+              Please wait while the Resource Library loads.
+            </p>
+          </div>
+        )}
 
-      {/* ===================================================
-          RESOURCE CARDS
-          =================================================== */}
+        {/* ERROR STATE */}
 
-      {!loading &&
-        !error && (
+        {!loading && error && (
+          <div className="no-resources">
+            <div className="empty-icon">⚠️</div>
+            <h2>Unable to Load Resources</h2>
+            <p>{error}</p>
 
-          <main className="resource-grid">
+            <button
+              type="button"
+              className="retry-button"
+              onClick={handleRetry}
+            >
+              Try Again
+            </button>
+          </div>
+        )}
 
-            {filteredResources.length >
-            0 ? (
+        {/* RESOURCE GRID */}
 
-              filteredResources.map(
-                resource => (
+        {!loading && !error && (
+          <section className="resource-grid">
+            {filteredResources.length > 0 ? (
+              filteredResources.map((resource, index) => {
+                const resourceType =
+                  getResourceType(resource);
 
+                const resourceKey =
+                  resource?.id ??
+                  `${resource?.title || "resource"}-${index}`;
+
+                const typeClass =
+                  resourceType.toLowerCase();
+
+                return (
                   <article
                     className="resource-card"
-                    key={resource.id}
+                    key={resourceKey}
                   >
-
-
-                    {/* CARD TOP */}
-
                     <div className="resource-card-top">
-
                       <div
-                        className={`resource-type-icon ${
-                          resource.type
-                            ?.toString()
-                            .toLowerCase() ||
-                          ""
-                        }`}
+                        className={`resource-type-icon ${typeClass}`}
                       >
-                        {resource.type ||
-                          "FILE"}
+                        {resourceType}
                       </div>
-
 
                       <span
-                        className={`resource-type-badge ${
-                          resource.type
-                            ?.toString()
-                            .toLowerCase() ||
-                          ""
-                        }`}
+                        className={`resource-type-badge ${typeClass}`}
                       >
-                        {resource.type ||
-                          "FILE"}
+                        {resourceType}
                       </span>
-
                     </div>
-
-
-                    {/* TITLE */}
 
                     <h2>
-                      {resource.title ||
-                        "Untitled Resource"}
+                      {resource?.title || "Untitled Resource"}
                     </h2>
 
-
-                    {/* SUBJECT */}
-
                     <p className="resource-subject">
-                      {resource.subject ||
-                        "—"}
+                      {resource?.subject ||
+                        "No subject specified"}
                     </p>
 
-
-                    {/* INFORMATION */}
-
                     <div className="resource-details">
-
-
                       <div>
-
-                        <span>
-                          Topic
-                        </span>
-
+                        <span>Topic</span>
                         <strong>
-                          {resource.topic ||
-                            "—"}
+                          {resource?.topic || "—"}
                         </strong>
-
                       </div>
 
-
                       <div>
-
-                        <span>
-                          Year Level
-                        </span>
-
+                        <span>Year Level</span>
                         <strong>
-                          {resource.yearLevel ||
-                            "—"}
+                          {resource?.yearLevel || "—"}
                         </strong>
-
                       </div>
 
-
                       <div>
-
-                        <span>
-                          Author
-                        </span>
-
+                        <span>Author</span>
                         <strong>
-                          {resource.author ||
-                            "—"}
+                          {resource?.author || "—"}
                         </strong>
-
                       </div>
 
-
                       <div>
-
-                        <span>
-                          File Size
-                        </span>
-
+                        <span>File Size</span>
                         <strong>
-                          {resource.size ||
-                            "—"}
+                          {resource?.size || "—"}
                         </strong>
-
                       </div>
-
                     </div>
-
-
-                    {/* DATE */}
 
                     <div className="resource-date">
-
                       Added{" "}
-
-                      {resource.dateAdded ||
-                        "—"}
-
+                      {formatDate(getResourceDate(resource))}
                     </div>
 
+                    {resource?.status && !isStudent && (
+                      <div className="resource-status">
+                        <span>Status</span>
 
-                    {/* ACTIONS */}
+                        <strong
+                          className={`status-${resource.status
+                            .toString()
+                            .toLowerCase()}`}
+                        >
+                          {resource.status}
+                        </strong>
+                      </div>
+                    )}
 
                     <div className="resource-actions">
-
-
-                      {/* VIEW */}
-
                       <button
                         type="button"
                         className="view-resource-button"
                         onClick={() =>
-                          setSelectedResource(
-                            resource
-                          )
+                          setSelectedResource(resource)
                         }
                       >
                         View
                       </button>
 
-
-                      {/* DOWNLOAD */}
-
                       <button
                         type="button"
                         className="download-resource-button"
                         onClick={() =>
-                          handleDownload(
-                            resource
-                          )
+                          void handleDownload(resource)
                         }
                         disabled={
-                          downloadingId ===
-                          resource.id
+                          downloadingId === resource.id
                         }
                       >
-
-                        {downloadingId ===
-                        resource.id
+                        {downloadingId === resource.id
                           ? "Downloading..."
                           : "Download"}
-
                       </button>
 
-
-                      {/* DELETE */}
-
                       {canDelete && (
-
                         <button
                           type="button"
                           className="delete-resource-button"
                           onClick={() =>
-                            handleDelete(
-                              resource
-                            )
+                            void handleDelete(resource)
                           }
                           disabled={
-                            deletingId ===
-                            resource.id
+                            deletingId === resource.id
                           }
                         >
-
-                          {deletingId ===
-                          resource.id
+                          {deletingId === resource.id
                             ? "Deleting..."
                             : "Delete"}
-
                         </button>
-
                       )}
-
                     </div>
-
                   </article>
-
-                )
-              )
-
+                );
+              })
             ) : (
-
               <div className="no-resources">
-
-                <div className="empty-icon">
-                  🔎
-                </div>
-
-                <h2>
-                  No resources found
-                </h2>
-
+                <div className="empty-icon">🔎</div>
+                <h2>No resources found</h2>
                 <p>
-                  Try changing your search
-                  or filters.
+                  Try changing your search or filters.
                 </p>
 
+                <button
+                  type="button"
+                  className="retry-button"
+                  onClick={handleClearFilters}
+                >
+                  Clear Filters
+                </button>
               </div>
-
             )}
-
-          </main>
-
+          </section>
         )}
-
-
-      {/* ===================================================
-          FOOTER
-          =================================================== */}
+      </main>
 
       <footer className="resources-footer">
-
-        © 2026 RLearn Hub —
-        Rosemont Hills Montessori College
-
+        © 2026 RLearn Hub — Rosemont Hills Montessori College
       </footer>
-
     </div>
   );
 }
-
 
 export default Resources;
