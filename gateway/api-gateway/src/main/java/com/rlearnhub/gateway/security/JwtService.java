@@ -1,8 +1,10 @@
+
 package com.rlearnhub.gateway.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -12,58 +14,48 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    /*
-     * This MUST match the secret used by Auth Service.
-     */
-    private static final String SECRET_KEY =
-            "RLearnHubDevelopmentSecretKey2026SecureJwtKey123456789";
+    private final SecretKey signingKey;
 
-    private SecretKey getSigningKey() {
+    public JwtService(@Value("${jwt.secret}") String secret) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalArgumentException(
+                    "JWT secret must be at least 32 characters long."
+            );
+        }
 
-        return Keys.hmacShaKeyFor(
-                SECRET_KEY.getBytes(StandardCharsets.UTF_8)
+        this.signingKey = Keys.hmacShaKeyFor(
+                secret.getBytes(StandardCharsets.UTF_8)
         );
     }
 
     public Claims extractClaims(String token) {
-
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
 
     public boolean isTokenValid(String token) {
-
         try {
-
             Claims claims = extractClaims(token);
 
-            return claims.getExpiration()
-                    .after(new Date());
-
+            return claims.getExpiration() != null
+                    && claims.getExpiration().after(new Date());
         } catch (Exception e) {
-
             return false;
         }
     }
 
     public String extractEmail(String token) {
-
-        return extractClaims(token)
-                .getSubject();
+        return extractClaims(token).getSubject();
     }
 
     public String extractRole(String token) {
-
-        return extractClaims(token)
-                .get("role", String.class);
+        return extractClaims(token).get("role", String.class);
     }
 
     public Long extractUserId(String token) {
-
-        return extractClaims(token)
-                .get("userId", Long.class);
+        return extractClaims(token).get("userId", Long.class);
     }
 }

@@ -1,1 +1,5 @@
 /services/resource-service/uploads/resources/
+# Environment variables and secrets
+.env
+.env.*
+!.env.example

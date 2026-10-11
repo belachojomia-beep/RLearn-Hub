@@ -25,72 +25,60 @@ public class JwtAuthenticationFilter
             GatewayFilterChain chain
     ) {
 
-        String path =
-                exchange.getRequest()
-                        .getURI()
-                        .getPath();
+        String path = exchange.getRequest()
+                .getURI()
+                .getPath();
 
-        String method =
-                exchange.getRequest()
-                        .getMethod()
-                        .name();
+        String method = exchange.getRequest()
+                .getMethod()
+                .name();
 
         /*
          * Login and registration are public.
          */
         if (path.equals("/api/auth/login")
                 || path.equals("/api/auth/register")) {
-
             return chain.filter(exchange);
         }
 
         /*
-         * Get Authorization header.
+         * Get the Authorization header.
          */
-        String authorizationHeader =
-                exchange.getRequest()
-                        .getHeaders()
-                        .getFirst(HttpHeaders.AUTHORIZATION);
+        String authorizationHeader = exchange.getRequest()
+                .getHeaders()
+                .getFirst(HttpHeaders.AUTHORIZATION);
 
         /*
-         * No JWT token.
+         * Reject requests without a Bearer token.
          */
         if (authorizationHeader == null
                 || !authorizationHeader.startsWith("Bearer ")) {
-
             return unauthorized(exchange);
         }
 
         /*
-         * Remove "Bearer " from the header.
+         * Extract and validate the JWT.
          */
-        String token =
-                authorizationHeader.substring(7);
+        String token = authorizationHeader.substring(7);
 
-        /*
-         * Validate JWT.
-         */
         if (!jwtService.isTokenValid(token)) {
-
             return unauthorized(exchange);
         }
 
         /*
          * Get the user's role from the JWT.
          */
-        String role =
-                jwtService.extractRole(token);
+        String role = jwtService.extractRole(token);
 
         /*
-         * Check role-based permissions.
+         * Enforce role-based permissions.
          */
         if (!isAllowed(path, method, role)) {
-
             return forbidden(exchange);
         }
 
         /*
-         * JWT is valid and the role is allowed.
+         * Token is valid and the role is allowed.
          */
         return chain.filter(exchange);
     }
@@ -100,36 +88,43 @@ public class JwtAuthenticationFilter
             String method,
             String role
     ) {
+
         /*
-     * Admin endpoints:
-     * ADMIN only.
-     */
-    if (path.startsWith("/api/admin/")) {
+         * ADMIN RESOURCE REVIEW:
+         * Only administrators may list pending resources
+         * and preview or download files for review.
+         */
+        if (path.equals("/api/resources/review")
+                || path.matches(
+                        "/api/resources/review/[0-9]+/(file|download)"
+                )) {
+            return role.equals("ADMIN");
+        }
 
-        return role.equals("ADMIN");
-    }
-    /*
-     * Resource upload:
-     * TEACHER and ADMIN only.
-     */
-    if (path.equals("/api/resources/upload")
-            && method.equals("POST")) {
+        /*
+         * Admin endpoints:
+         * ADMIN only.
+         */
+        if (path.startsWith("/api/admin/")) {
+            return role.equals("ADMIN");
+        }
 
-        return role.equals("TEACHER")
-                || role.equals("ADMIN");
-    }
         /*
          * Resource upload:
          * TEACHER and ADMIN only.
          */
+        if (path.equals("/api/resources/upload")
+                && method.equals("POST")) {
+            return role.equals("TEACHER")
+                    || role.equals("ADMIN");
+        }
 
         /*
-         * Resource delete:
+         * Resource deletion:
          * TEACHER and ADMIN only.
          */
         if (path.matches("/api/resources/[0-9]+")
                 && method.equals("DELETE")) {
-
             return role.equals("TEACHER")
                     || role.equals("ADMIN");
         }
@@ -140,35 +135,33 @@ public class JwtAuthenticationFilter
          */
         if (path.equals("/api/subjects")
                 && method.equals("POST")) {
-
             return role.equals("TEACHER")
                     || role.equals("ADMIN");
         }
 
         /*
-         * Subject update/delete:
+         * Subject update and deletion:
          * TEACHER and ADMIN only.
          */
         if (path.matches("/api/subjects/[0-9]+")
                 && (method.equals("PUT")
                 || method.equals("DELETE"))) {
-
             return role.equals("TEACHER")
                     || role.equals("ADMIN");
         }
 
         /*
-         * All other authenticated requests
-         * are currently allowed.
+         * Other authenticated requests are allowed by this
+         * filter, subject to the downstream service's own
+         * authorization and validation.
          *
-         * This includes:
-         * GET resources
+         * Examples:
+         * GET approved resources
          * GET subjects
-         * resource downloads
-         * download tracking
-         * notifications
+         * regular resource downloads
          * announcements
-         * dashboard
+         * notifications
+         * dashboard requests
          */
         return true;
     }
@@ -180,8 +173,7 @@ public class JwtAuthenticationFilter
         exchange.getResponse()
                 .setStatusCode(HttpStatus.UNAUTHORIZED);
 
-        return exchange.getResponse()
-                .setComplete();
+        return exchange.getResponse().setComplete();
     }
 
     private Mono<Void> forbidden(
@@ -191,8 +183,7 @@ public class JwtAuthenticationFilter
         exchange.getResponse()
                 .setStatusCode(HttpStatus.FORBIDDEN);
 
-        return exchange.getResponse()
-                .setComplete();
+        return exchange.getResponse().setComplete();
     }
 
     @Override

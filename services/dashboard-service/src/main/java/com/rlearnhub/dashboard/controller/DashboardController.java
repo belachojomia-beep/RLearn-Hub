@@ -1,7 +1,9 @@
+
 package com.rlearnhub.dashboard.controller;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -24,21 +26,34 @@ public class DashboardController {
     }
 
     @GetMapping("/api/dashboard/stats")
-    public Map<String, Integer> stats() {
-
-        int resources = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM resources",
-                Integer.class
+    public Map<String, Long> stats(
+            @RequestParam String email
+    ) {
+        // Count only approved resources available to users.
+        Long resources = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM resources
+                WHERE UPPER(status) = 'APPROVED'
+                """,
+                Long.class
         );
 
-        int downloads = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM downloads",
-                Integer.class
+        // Count downloads belonging to this logged-in user.
+        Long downloads = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM downloads
+                WHERE LOWER(user_email) = LOWER(?)
+                """,
+                Long.class,
+                email.trim()
         );
 
-        int subjects = jdbcTemplate.queryForObject(
+        // Keep the existing total subject count.
+        Long subjects = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM subjects",
-                Integer.class
+                Long.class
         );
 
         return Map.of(

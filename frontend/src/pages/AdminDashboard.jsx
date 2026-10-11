@@ -1,19 +1,11 @@
 import { useEffect, useState } from "react";
 import "./AdminDashboard.css";
 
-/* =========================================================
-   RLEARN HUB — ADMIN DASHBOARD
-   Rosemont Hills Montessori College
-
-   API GATEWAY
-   All frontend requests go through port 8080.
-========================================================= */
-
 const BACKEND_API = "http://localhost:8080";
 const ANNOUNCEMENT_API = `${BACKEND_API}/api/announcements`;
 
 /* =========================================================
-   GET JWT TOKEN
+   AUTHENTICATION
 ========================================================= */
 
 const getToken = () =>
@@ -21,38 +13,113 @@ const getToken = () =>
   localStorage.getItem("rlearnhub_token") ||
   "";
 
-/* =========================================================
-   AUTH HEADERS
-========================================================= */
-
 const getAuthHeaders = () => {
   const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
-  return token
-    ? { Authorization: `Bearer ${token}` }
-    : {};
+/* =========================================================
+   CURRENT USER EMAIL
+========================================================= */
+
+const getCurrentUserEmail = (user) => {
+  const propEmail =
+    typeof user?.email === "string" ? user.email.trim() : "";
+
+  if (propEmail) return propEmail;
+
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const savedUser = storage.getItem("rlearnhub_user");
+      if (!savedUser) continue;
+
+      const parsedUser = JSON.parse(savedUser);
+      const email =
+        typeof parsedUser?.email === "string"
+          ? parsedUser.email.trim()
+          : "";
+
+      if (email) return email;
+    } catch (error) {
+      console.warn("Unable to read saved user:", error);
+    }
+  }
+
+  return "";
 };
 
 /* =========================================================
    RESOURCE DOWNLOAD URL
+   ADMIN REVIEW ENDPOINT
+   The backend requires the email query parameter.
 ========================================================= */
 
-const getResourceDownloadUrl = (resource) => {
+const getResourceDownloadUrl = (resource, userEmail) => {
   const email =
-    resource?.email ||
-    resource?.uploadedByEmail ||
-    resource?.authorEmail ||
-    "";
+    typeof userEmail === "string" ? userEmail.trim() : "";
 
-  const url = `${BACKEND_API}/api/resources/${resource.id}/download`;
+  if (!resource?.id) {
+    throw new Error("This resource does not have a valid ID.");
+  }
 
-  return email
-    ? `${url}?email=${encodeURIComponent(email)}`
-    : url;
+  if (!email) {
+    throw new Error(
+      "Your account email could not be found. Please log out and log in again."
+    );
+  }
+
+  // Use the administrator review endpoint so pending resources
+  // can be downloaded before they are approved.
+  const url = `${BACKEND_API}/api/resources/review/${resource.id}/download`;
+
+  return `${url}?email=${encodeURIComponent(email)}`;
 };
 
 /* =========================================================
-   FILE EXTENSION
+   ANNOUNCEMENT DATE HELPERS
+========================================================= */
+
+const getAnnouncementDate = (announcement) =>
+  announcement?.datePosted ||
+  announcement?.date ||
+  announcement?.dateCreated ||
+  announcement?.createdAt ||
+  null;
+
+const formatAnnouncementDate = (value) => {
+  if (!value) return "Date not available";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+const sortAnnouncements = (items) =>
+  [...items].sort((a, b) => {
+    const dateA = new Date(getAnnouncementDate(a) || 0).getTime();
+    const dateB = new Date(getAnnouncementDate(b) || 0).getTime();
+
+    if (
+      Number.isFinite(dateA) &&
+      Number.isFinite(dateB) &&
+      dateA !== dateB
+    ) {
+      return dateB - dateA;
+    }
+
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+
+/* =========================================================
+   FILE HELPERS
 ========================================================= */
 
 const getFileExtension = (resource) => {
@@ -68,15 +135,8 @@ const getFileExtension = (resource) => {
     ? fileName.split(".").pop().toLowerCase()
     : "";
 
-  return (
-    extension ||
-    type.toString().replace(".", "").toLowerCase()
-  );
+  return extension || type.toString().replace(".", "").toLowerCase();
 };
-
-/* =========================================================
-   CHECK IF BROWSER CAN PREVIEW FILE
-========================================================= */
 
 const canPreviewResource = (resource, blobType = "") => {
   const extension = getFileExtension(resource);
@@ -109,9 +169,7 @@ function AdminDashboard({ user, onLogout }) {
 
   const [activePage, setActivePage] = useState("Dashboard");
 
-  /* =======================================================
-     DASHBOARD VIEW ALL
-  ======================================================= */
+  /* Dashboard View All */
 
   const [showAllRecentResources, setShowAllRecentResources] =
     useState(false);
@@ -126,9 +184,7 @@ function AdminDashboard({ user, onLogout }) {
     setShowAllDashboardApprovals,
   ] = useState(false);
 
-  /* =======================================================
-     ANNOUNCEMENTS
-  ======================================================= */
+  /* Announcements */
 
   const [announcements, setAnnouncements] = useState([]);
   const [announcementsLoading, setAnnouncementsLoading] =
@@ -142,17 +198,13 @@ function AdminDashboard({ user, onLogout }) {
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [announcementSaving, setAnnouncementSaving] = useState(false);
 
-  /* =======================================================
-     RECENT RESOURCES
-  ======================================================= */
+  /* Recent Resources */
 
   const [recentResources, setRecentResources] = useState([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState("");
 
-  /* =======================================================
-     DASHBOARD STATISTICS
-  ======================================================= */
+  /* Dashboard Statistics */
 
   const [dashboardStats, setDashboardStats] = useState({
     totalUsers: 0,
@@ -167,17 +219,13 @@ function AdminDashboard({ user, onLogout }) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState("");
 
-  /* =======================================================
-     MANAGE USERS
-  ======================================================= */
+  /* Manage Users */
 
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
 
-  /* =======================================================
-     REVIEW RESOURCES
-  ======================================================= */
+  /* Review Resources */
 
   const [reviewResources, setReviewResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
@@ -185,9 +233,7 @@ function AdminDashboard({ user, onLogout }) {
   const [processingResourceId, setProcessingResourceId] =
     useState(null);
 
-  /* =======================================================
-     FILE ACTION STATE
-  ======================================================= */
+  /* Resource Actions */
 
   const [viewingResourceId, setViewingResourceId] = useState(null);
   const [downloadingResourceId, setDownloadingResourceId] =
@@ -246,9 +292,7 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         if (responses.some((response) => !response.ok)) {
-          throw new Error(
-            "Failed to load dashboard statistics."
-          );
+          throw new Error("Failed to load dashboard statistics.");
         }
 
         const [usersData, resourcesData, pendingData] =
@@ -291,7 +335,8 @@ function AdminDashboard({ user, onLogout }) {
           totalResources = resourcesData.length;
 
           approvedResources = resourcesData.filter(
-            (resource) => resource.status?.toUpperCase() === "APPROVED"
+            (resource) =>
+              resource.status?.toUpperCase() === "APPROVED"
           ).length;
         } else {
           approvedResources = resourcesData.length;
@@ -314,14 +359,11 @@ function AdminDashboard({ user, onLogout }) {
 
         if (!cancelled) {
           setStatsError(
-            error.message ||
-              "Unable to load dashboard statistics."
+            error.message || "Unable to load dashboard statistics."
           );
         }
       } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
+        if (!cancelled) setStatsLoading(false);
       }
     };
 
@@ -384,9 +426,7 @@ function AdminDashboard({ user, onLogout }) {
           );
         }
       } finally {
-        if (!cancelled) {
-          setRecentLoading(false);
-        }
+        if (!cancelled) setRecentLoading(false);
       }
     };
 
@@ -447,9 +487,7 @@ function AdminDashboard({ user, onLogout }) {
           setUsersError(error.message || "Unable to load users.");
         }
       } finally {
-        if (!cancelled) {
-          setUsersLoading(false);
-        }
+        if (!cancelled) setUsersLoading(false);
       }
     };
 
@@ -500,9 +538,7 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         if (!response.ok) {
-          throw new Error(
-            "Failed to load resources for review."
-          );
+          throw new Error("Failed to load resources for review.");
         }
 
         const data = await response.json();
@@ -519,9 +555,7 @@ function AdminDashboard({ user, onLogout }) {
           );
         }
       } finally {
-        if (!cancelled) {
-          setResourcesLoading(false);
-        }
+        if (!cancelled) setResourcesLoading(false);
       }
     };
 
@@ -573,10 +607,9 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         const data = await response.json();
-
-        const sortedAnnouncements = (
-          Array.isArray(data) ? [...data] : []
-        ).sort((a, b) => Number(b.id) - Number(a.id));
+        const sortedAnnouncements = sortAnnouncements(
+          Array.isArray(data) ? data : []
+        );
 
         if (!cancelled) {
           setAnnouncements(sortedAnnouncements);
@@ -590,9 +623,7 @@ function AdminDashboard({ user, onLogout }) {
           );
         }
       } finally {
-        if (!cancelled) {
-          setAnnouncementsLoading(false);
-        }
+        if (!cancelled) setAnnouncementsLoading(false);
       }
     };
 
@@ -605,13 +636,14 @@ function AdminDashboard({ user, onLogout }) {
 
   /* =========================================================
      VIEW RESOURCE
+     IMPORTANT:
+     Use /api/resources/review/{id}/file for administrator
+     preview. Do not use the regular approved-resource endpoint.
   ========================================================= */
 
   const handleViewResource = async (resource) => {
     if (!resource?.id) {
-      setResourcesError(
-        "This resource does not have a valid ID."
-      );
+      setResourcesError("This resource does not have a valid ID.");
       return;
     }
 
@@ -630,6 +662,7 @@ function AdminDashboard({ user, onLogout }) {
         );
       }
 
+      // Open the preview window immediately to avoid popup blocking.
       previewWindow = window.open("", "_blank");
 
       if (!previewWindow) {
@@ -660,15 +693,16 @@ function AdminDashboard({ user, onLogout }) {
         </html>
       `);
 
-      const response = await fetch(
-        getResourceDownloadUrl(resource),
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Admin-only preview endpoint for pending resources.
+      const previewUrl =
+        `${BACKEND_API}/api/resources/review/${resource.id}/file`;
+
+      const response = await fetch(previewUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.status === 401) {
         throw new Error(
@@ -678,13 +712,16 @@ function AdminDashboard({ user, onLogout }) {
 
       if (response.status === 403) {
         throw new Error(
-          "You do not have permission to view this resource."
+          "You do not have administrator permission to preview this resource."
         );
       }
 
       if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+
         throw new Error(
-          `Unable to open resource. Server returned ${response.status}.`
+          `Unable to open resource. Server returned ${response.status}.` +
+            (responseText ? ` ${responseText}` : "")
         );
       }
 
@@ -695,6 +732,7 @@ function AdminDashboard({ user, onLogout }) {
         previewWindow.location.href = objectUrl;
 
         const urlToRevoke = objectUrl;
+
         window.setTimeout(() => {
           URL.revokeObjectURL(urlToRevoke);
         }, 60000);
@@ -710,6 +748,7 @@ function AdminDashboard({ user, onLogout }) {
         const downloadLink = document.createElement("a");
         downloadLink.href = objectUrl;
         downloadLink.download = fileName;
+
         document.body.appendChild(downloadLink);
         downloadLink.click();
         downloadLink.remove();
@@ -717,6 +756,7 @@ function AdminDashboard({ user, onLogout }) {
         previewWindow.close();
 
         const urlToRevoke = objectUrl;
+
         window.setTimeout(() => {
           URL.revokeObjectURL(urlToRevoke);
         }, 1000);
@@ -734,23 +774,19 @@ function AdminDashboard({ user, onLogout }) {
         error.message || "Unable to view resource."
       );
     } finally {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       setViewingResourceId(null);
     }
   };
 
   /* =========================================================
      DOWNLOAD RESOURCE
+     Uses /api/resources/review/{id}/download?email=...
   ========================================================= */
 
   const handleDownloadResource = async (resource) => {
     if (!resource?.id) {
-      setResourcesError(
-        "This resource does not have a valid ID."
-      );
+      setResourcesError("This resource does not have a valid ID.");
       return;
     }
 
@@ -768,15 +804,18 @@ function AdminDashboard({ user, onLogout }) {
         );
       }
 
-      const response = await fetch(
-        getResourceDownloadUrl(resource),
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const email = getCurrentUserEmail(user);
+
+      // This helper now returns the administrator review download URL
+      // and includes the required email query parameter.
+      const downloadUrl = getResourceDownloadUrl(resource, email);
+
+      const response = await fetch(downloadUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.status === 401) {
         throw new Error(
@@ -786,13 +825,16 @@ function AdminDashboard({ user, onLogout }) {
 
       if (response.status === 403) {
         throw new Error(
-          "You do not have permission to download this resource."
+          "You do not have administrator permission to download this resource."
         );
       }
 
       if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+
         throw new Error(
-          `Unable to download resource. Server returned ${response.status}.`
+          `Unable to download resource. Server returned ${response.status}.` +
+            (responseText ? ` ${responseText}` : "")
         );
       }
 
@@ -828,10 +870,7 @@ function AdminDashboard({ user, onLogout }) {
         error.message || "Unable to download resource."
       );
     } finally {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       setDownloadingResourceId(null);
     }
   };
@@ -866,13 +905,15 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to approve resource.");
+        const responseText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to approve resource. Server returned ${response.status}.` +
+            (responseText ? ` ${responseText}` : "")
+        );
       }
 
-      setReviewResources((currentResources) =>
-        currentResources.filter(
-          (resource) => resource.id !== resourceId
-        )
+      setReviewResources((current) =>
+        current.filter((resource) => resource.id !== resourceId)
       );
 
       setDashboardStats((current) => ({
@@ -888,6 +929,7 @@ function AdminDashboard({ user, onLogout }) {
             : current.totalResources,
       }));
 
+      // Refresh the review page after processing.
       if (activePage === "Dashboard") {
         setActivePage("Review Resources");
       }
@@ -907,11 +949,13 @@ function AdminDashboard({ user, onLogout }) {
   ========================================================= */
 
   const handleRejectResource = async (resourceId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to reject this resource?"
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to reject this resource?"
+      )
+    ) {
+      return;
+    }
 
     setProcessingResourceId(resourceId);
     setResourcesError("");
@@ -938,13 +982,15 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to reject resource.");
+        const responseText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to reject resource. Server returned ${response.status}.` +
+            (responseText ? ` ${responseText}` : "")
+        );
       }
 
-      setReviewResources((currentResources) =>
-        currentResources.filter(
-          (resource) => resource.id !== resourceId
-        )
+      setReviewResources((current) =>
+        current.filter((resource) => resource.id !== resourceId)
       );
 
       setDashboardStats((current) => ({
@@ -1008,12 +1054,19 @@ function AdminDashboard({ user, onLogout }) {
   const handleSaveAnnouncement = async (event) => {
     event.preventDefault();
 
-    if (
-      !announcementTitle.trim() ||
-      !announcementMessage.trim()
-    ) {
-      window.alert(
-        "Please enter both a title and a message."
+    const trimmedTitle = announcementTitle.trim();
+    const trimmedMessage = announcementMessage.trim();
+
+    if (!trimmedTitle || !trimmedMessage) {
+      window.alert("Please enter both a title and a message.");
+      return;
+    }
+
+    const token = getToken();
+
+    if (!token) {
+      setAnnouncementsError(
+        "Your login session is missing. Please log in again."
       );
       return;
     }
@@ -1021,24 +1074,22 @@ function AdminDashboard({ user, onLogout }) {
     setAnnouncementsError("");
     setAnnouncementSaving(true);
 
+    const isEditing = editingAnnouncementId !== null;
+
     try {
-      const formattedDate = new Date().toLocaleDateString(
-        "en-US",
-        {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        }
+      const existingAnnouncement = announcements.find(
+        (item) => item.id === editingAnnouncementId
       );
 
       const announcementData = {
-        title: announcementTitle.trim(),
-        message: announcementMessage.trim(),
-        date: formattedDate,
+        title: trimmedTitle,
+        message: trimmedMessage,
         author: adminName,
+        datePosted: isEditing
+          ? getAnnouncementDate(existingAnnouncement) ||
+            new Date().toISOString()
+          : new Date().toISOString(),
       };
-
-      const isEditing = editingAnnouncementId !== null;
 
       const url = isEditing
         ? `${ANNOUNCEMENT_API}/${editingAnnouncementId}`
@@ -1049,6 +1100,7 @@ function AdminDashboard({ user, onLogout }) {
         headers: {
           ...getAuthHeaders(),
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify(announcementData),
       });
@@ -1066,34 +1118,57 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+
         throw new Error(
-          isEditing
+          `${isEditing
             ? "Failed to update announcement."
             : "Failed to create announcement."
+          } Server returned ${response.status}.` +
+            (responseText ? ` ${responseText}` : "")
         );
       }
 
-      const savedAnnouncement =
-        response.status === 204
-          ? {
+      let savedAnnouncement;
+
+      if (response.status === 204) {
+        savedAnnouncement = {
+          id: editingAnnouncementId,
+          ...announcementData,
+        };
+      } else {
+        const responseText = await response.text();
+
+        if (responseText) {
+          try {
+            savedAnnouncement = JSON.parse(responseText);
+          } catch {
+            savedAnnouncement = {
               id: editingAnnouncementId,
               ...announcementData,
-            }
-          : await response.json();
+            };
+          }
+        } else {
+          savedAnnouncement = {
+            id: editingAnnouncementId,
+            ...announcementData,
+          };
+        }
+      }
 
-      setAnnouncements((currentAnnouncements) => {
-        if (isEditing) {
-          return currentAnnouncements
-            .map((announcement) =>
+      setAnnouncements((current) => {
+        const updated = isEditing
+          ? current.map((announcement) =>
               announcement.id === editingAnnouncementId
-                ? savedAnnouncement
+                ? {
+                    ...announcement,
+                    ...savedAnnouncement,
+                  }
                 : announcement
             )
-            .sort((a, b) => Number(b.id) - Number(a.id));
-        }
+          : [savedAnnouncement, ...current];
 
-        return [savedAnnouncement, ...currentAnnouncements]
-          .sort((a, b) => Number(b.id) - Number(a.id));
+        return sortAnnouncements(updated);
       });
 
       handleCancelAnnouncement();
@@ -1103,7 +1178,7 @@ function AdminDashboard({ user, onLogout }) {
       setAnnouncementsError(
         error.message || "Unable to save announcement."
       );
-
+    } finally {
       setAnnouncementSaving(false);
     }
   };
@@ -1113,11 +1188,13 @@ function AdminDashboard({ user, onLogout }) {
   ========================================================= */
 
   const handleDeleteAnnouncement = async (announcementId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this announcement?"
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this announcement?"
+      )
+    ) {
+      return;
+    }
 
     setAnnouncementsError("");
 
@@ -1146,8 +1223,8 @@ function AdminDashboard({ user, onLogout }) {
         throw new Error("Failed to delete announcement.");
       }
 
-      setAnnouncements((currentAnnouncements) =>
-        currentAnnouncements.filter(
+      setAnnouncements((current) =>
+        current.filter(
           (announcement) => announcement.id !== announcementId
         )
       );
@@ -1177,17 +1254,10 @@ function AdminDashboard({ user, onLogout }) {
   ========================================================= */
 
   const renderResourceActions = (resource) => {
-    const isProcessing =
-      processingResourceId === resource.id;
-
-    const isViewing =
-      viewingResourceId === resource.id;
-
-    const isDownloading =
-      downloadingResourceId === resource.id;
-
-    const isBusy =
-      isProcessing || isViewing || isDownloading;
+    const isProcessing = processingResourceId === resource.id;
+    const isViewing = viewingResourceId === resource.id;
+    const isDownloading = downloadingResourceId === resource.id;
+    const isBusy = isProcessing || isViewing || isDownloading;
 
     return (
       <div className="admin-resource-actions">
@@ -1253,52 +1323,48 @@ function AdminDashboard({ user, onLogout }) {
             {usersLoading && <p>Loading users...</p>}
 
             {usersError && (
-              <div className="admin-error-message">
-                {usersError}
-              </div>
+              <div className="admin-error-message">{usersError}</div>
             )}
 
-            {!usersLoading &&
-              !usersError &&
-              users.length === 0 && <p>No users found.</p>}
+            {!usersLoading && !usersError && users.length === 0 && (
+              <p>No users found.</p>
+            )}
 
-            {!usersLoading &&
-              !usersError &&
-              users.length > 0 && (
-                <div className="admin-table-wrapper">
-                  <table className="admin-user-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
+            {!usersLoading && !usersError && users.length > 0 && (
+              <div className="admin-table-wrapper">
+                <table className="admin-user-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {users.map((account) => (
+                      <tr key={account.id}>
+                        <td>{account.id}</td>
+                        <td>
+                          <strong>{account.name}</strong>
+                        </td>
+                        <td>{account.email}</td>
+                        <td>
+                          <span
+                            className={`admin-role-badge ${
+                              account.role?.toLowerCase() || ""
+                            }`}
+                          >
+                            {account.role}
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-
-                    <tbody>
-                      {users.map((account) => (
-                        <tr key={account.id}>
-                          <td>{account.id}</td>
-                          <td>
-                            <strong>{account.name}</strong>
-                          </td>
-                          <td>{account.email}</td>
-                          <td>
-                            <span
-                              className={`admin-role-badge ${
-                                account.role?.toLowerCase() || ""
-                              }`}
-                            >
-                              {account.role}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         );
 
@@ -1344,65 +1410,59 @@ function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
-            {!resourcesLoading &&
-              reviewResources.length > 0 && (
-                <div className="admin-review-list">
-                  {reviewResources.map((resource) => (
-                    <div
-                      className="admin-review-card"
-                      key={resource.id}
-                    >
-                      <div className="admin-resource-file">
-                        <span>
-                          {resource.type ||
-                            getFileExtension(resource) ||
-                            "FILE"}
-                        </span>
-                      </div>
-
-                      <div className="admin-review-information">
-                        <h4>
-                          {resource.title || "Untitled Resource"}
-                        </h4>
-
-                        <p>
-                          <strong>Subject:</strong>{" "}
-                          {resource.subject || "N/A"}
-                        </p>
-
-                        <p>
-                          <strong>Topic:</strong>{" "}
-                          {resource.topic || "N/A"}
-                        </p>
-
-                        <p>
-                          <strong>Year Level:</strong>{" "}
-                          {resource.yearLevel || "N/A"}
-                        </p>
-
-                        <p>
-                          <strong>Uploaded by:</strong>{" "}
-                          {resource.author || "Unknown"}
-                        </p>
-
-                        <small>
-                          <strong>File:</strong>{" "}
-                          {resource.fileName || "Uploaded resource"}
-                          {" • "}
-                          <strong>Size:</strong>{" "}
-                          {resource.size || "N/A"}
-                        </small>
-                      </div>
-
-                      <span className="admin-status-badge pending">
-                        PENDING
+            {!resourcesLoading && reviewResources.length > 0 && (
+              <div className="admin-review-list">
+                {reviewResources.map((resource) => (
+                  <div
+                    className="admin-review-card"
+                    key={resource.id}
+                  >
+                    <div className="admin-resource-file">
+                      <span>
+                        {resource.type ||
+                          getFileExtension(resource) ||
+                          "FILE"}
                       </span>
-
-                      {renderResourceActions(resource)}
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    <div className="admin-review-information">
+                      <h4>
+                        {resource.title || "Untitled Resource"}
+                      </h4>
+                      <p>
+                        <strong>Subject:</strong>{" "}
+                        {resource.subject || "N/A"}
+                      </p>
+                      <p>
+                        <strong>Topic:</strong>{" "}
+                        {resource.topic || "N/A"}
+                      </p>
+                      <p>
+                        <strong>Year Level:</strong>{" "}
+                        {resource.yearLevel || "N/A"}
+                      </p>
+                      <p>
+                        <strong>Uploaded by:</strong>{" "}
+                        {resource.author || "Unknown"}
+                      </p>
+                      <small>
+                        <strong>File:</strong>{" "}
+                        {resource.fileName || "Uploaded resource"}
+                        {" • "}
+                        <strong>Size:</strong>{" "}
+                        {resource.size || "N/A"}
+                      </small>
+                    </div>
+
+                    <span className="admin-status-badge pending">
+                      PENDING
+                    </span>
+
+                    {renderResourceActions(resource)}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         );
 
@@ -1432,9 +1492,7 @@ function AdminDashboard({ user, onLogout }) {
                 Loading reports...
               </div>
             ) : statsError ? (
-              <div className="admin-error-message">
-                {statsError}
-              </div>
+              <div className="admin-error-message">{statsError}</div>
             ) : (
               <>
                 <div className="admin-report-section">
@@ -1452,17 +1510,14 @@ function AdminDashboard({ user, onLogout }) {
                       <span>Total Users</span>
                       <strong>{dashboardStats.totalUsers}</strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Students</span>
                       <strong>{dashboardStats.students}</strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Teachers</span>
                       <strong>{dashboardStats.teachers}</strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Administrators</span>
                       <strong>{dashboardStats.admins}</strong>
@@ -1485,19 +1540,18 @@ function AdminDashboard({ user, onLogout }) {
                       <span>Total Resources</span>
                       <strong>{dashboardStats.totalResources}</strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Approved Resources</span>
                       <strong>
                         {dashboardStats.approvedResources}
                       </strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Pending Resources</span>
-                      <strong>{dashboardStats.pendingResources}</strong>
+                      <strong>
+                        {dashboardStats.pendingResources}
+                      </strong>
                     </div>
-
                     <div className="admin-report-card">
                       <span>Approval Rate</span>
                       <strong>{approvalRate}%</strong>
@@ -1579,9 +1633,7 @@ function AdminDashboard({ user, onLogout }) {
                 </div>
 
                 <div className="admin-form-group">
-                  <label htmlFor="announcementTitle">
-                    Title
-                  </label>
+                  <label htmlFor="announcementTitle">Title</label>
                   <input
                     id="announcementTitle"
                     type="text"
@@ -1590,15 +1642,14 @@ function AdminDashboard({ user, onLogout }) {
                       setAnnouncementTitle(event.target.value)
                     }
                     placeholder="Enter announcement title"
+                    maxLength={150}
                     disabled={announcementSaving}
                     required
                   />
                 </div>
 
                 <div className="admin-form-group">
-                  <label htmlFor="announcementMessage">
-                    Message
-                  </label>
+                  <label htmlFor="announcementMessage">Message</label>
                   <textarea
                     id="announcementMessage"
                     value={announcementMessage}
@@ -1607,6 +1658,7 @@ function AdminDashboard({ user, onLogout }) {
                     }
                     placeholder="Enter announcement message"
                     rows={5}
+                    maxLength={2000}
                     disabled={announcementSaving}
                     required
                   />
@@ -1649,54 +1701,50 @@ function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
-            {!announcementsLoading &&
-              announcements.length > 0 && (
-                <div className="admin-announcement-list">
-                  {announcements.map((announcement) => (
-                    <div
-                      className="admin-announcement-row"
-                      key={announcement.id}
-                    >
-                      <div className="admin-announcement-icon">
-                        A
-                      </div>
+            {!announcementsLoading && announcements.length > 0 && (
+              <div className="admin-announcement-list">
+                {announcements.map((announcement) => (
+                  <div
+                    className="admin-announcement-row"
+                    key={announcement.id}
+                  >
+                    <div className="admin-announcement-icon">A</div>
 
-                      <div className="admin-announcement-content">
-                        <strong>{announcement.title}</strong>
-                        <p>{announcement.message}</p>
-                        <small>
-                          {announcement.date ||
-                            announcement.datePosted ||
-                            announcement.dateCreated ||
-                            ""}
-                        </small>
-                      </div>
-
-                      <div className="admin-management-actions">
-                        <button
-                          type="button"
-                          className="admin-edit-button"
-                          onClick={() =>
-                            handleEditAnnouncement(announcement)
-                          }
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          className="admin-delete-button"
-                          onClick={() =>
-                            handleDeleteAnnouncement(announcement.id)
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <div className="admin-announcement-content">
+                      <strong>{announcement.title}</strong>
+                      <p>{announcement.message}</p>
+                      <small>
+                        {formatAnnouncementDate(
+                          getAnnouncementDate(announcement)
+                        )}
+                      </small>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    <div className="admin-management-actions">
+                      <button
+                        type="button"
+                        className="admin-edit-button"
+                        onClick={() =>
+                          handleEditAnnouncement(announcement)
+                        }
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="admin-delete-button"
+                        onClick={() =>
+                          handleDeleteAnnouncement(announcement.id)
+                        }
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         );
 
@@ -1712,6 +1760,7 @@ function AdminDashboard({ user, onLogout }) {
   return (
     <div className="admin-layout">
       {/* SIDEBAR */}
+
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <div className="admin-logo">
@@ -1763,31 +1812,30 @@ function AdminDashboard({ user, onLogout }) {
       </aside>
 
       {/* MAIN CONTENT */}
+
       <main className="admin-main">
         {activePage === "Dashboard" ? (
           <>
             {/* WELCOME */}
+
             <section className="admin-welcome">
               <div>
-                <span className="admin-label">
-                  Administration
-                </span>
+                <span className="admin-label">Administration</span>
                 <h2>Admin Dashboard</h2>
                 <p>
-                  Manage RLearn Hub users, resources,
-                  announcements, and system activities.
+                  Manage RLearn Hub users, resources, announcements,
+                  and system activities.
                 </p>
               </div>
             </section>
 
             {/* STATISTICS */}
+
             <section className="admin-statistics">
               <div className="admin-stat-card">
                 <div className="admin-stat-content">
                   <strong>
-                    {statsLoading
-                      ? "..."
-                      : dashboardStats.totalResources}
+                    {statsLoading ? "..." : dashboardStats.totalResources}
                   </strong>
                   <span>Total Resources</span>
                 </div>
@@ -1796,9 +1844,7 @@ function AdminDashboard({ user, onLogout }) {
               <div className="admin-stat-card">
                 <div className="admin-stat-content">
                   <strong>
-                    {statsLoading
-                      ? "..."
-                      : dashboardStats.totalUsers}
+                    {statsLoading ? "..." : dashboardStats.totalUsers}
                   </strong>
                   <span>Total Users</span>
                 </div>
@@ -1828,12 +1874,11 @@ function AdminDashboard({ user, onLogout }) {
             </section>
 
             {statsError && (
-              <div className="admin-error-message">
-                {statsError}
-              </div>
+              <div className="admin-error-message">{statsError}</div>
             )}
 
             {/* RECENT RESOURCES */}
+
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
@@ -1857,9 +1902,7 @@ function AdminDashboard({ user, onLogout }) {
               </div>
 
               <div className="admin-resource-list">
-                {recentLoading && (
-                  <p>Loading recent resources...</p>
-                )}
+                {recentLoading && <p>Loading recent resources...</p>}
 
                 {recentError && (
                   <div className="admin-error-message">
@@ -1875,10 +1918,9 @@ function AdminDashboard({ user, onLogout }) {
 
                 {!recentLoading &&
                   !recentError &&
-                  (
-                    showAllRecentResources
-                      ? recentResources
-                      : recentResources.slice(0, 3)
+                  (showAllRecentResources
+                    ? recentResources
+                    : recentResources.slice(0, 3)
                   ).map((resource) => (
                     <div
                       className="admin-resource-row"
@@ -1910,6 +1952,7 @@ function AdminDashboard({ user, onLogout }) {
             </section>
 
             {/* ANNOUNCEMENTS */}
+
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
@@ -1953,27 +1996,23 @@ function AdminDashboard({ user, onLogout }) {
 
                 {!announcementsLoading &&
                   !announcementsError &&
-                  (
-                    showAllDashboardAnnouncements
-                      ? announcements
-                      : announcements.slice(0, 3)
+                  (showAllDashboardAnnouncements
+                    ? announcements
+                    : announcements.slice(0, 3)
                   ).map((announcement) => (
                     <div
                       className="admin-announcement-row"
                       key={announcement.id}
                     >
-                      <div className="admin-announcement-icon">
-                        A
-                      </div>
+                      <div className="admin-announcement-icon">A</div>
 
                       <div className="admin-announcement-content">
                         <strong>{announcement.title}</strong>
                         <p>{announcement.message}</p>
                         <small>
-                          {announcement.date ||
-                            announcement.datePosted ||
-                            announcement.dateCreated ||
-                            ""}
+                          {formatAnnouncementDate(
+                            getAnnouncementDate(announcement)
+                          )}
                         </small>
                       </div>
                     </div>
@@ -1982,6 +2021,7 @@ function AdminDashboard({ user, onLogout }) {
             </section>
 
             {/* RESOURCE APPROVALS */}
+
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
@@ -2008,9 +2048,7 @@ function AdminDashboard({ user, onLogout }) {
                 )}
               </div>
 
-              {resourcesLoading && (
-                <p>Loading pending resources...</p>
-              )}
+              {resourcesLoading && <p>Loading pending resources...</p>}
 
               {resourcesError && (
                 <div className="admin-error-message">
@@ -2032,10 +2070,9 @@ function AdminDashboard({ user, onLogout }) {
 
               {!resourcesLoading &&
                 !resourcesError &&
-                (
-                  showAllDashboardApprovals
-                    ? reviewResources
-                    : reviewResources.slice(0, 3)
+                (showAllDashboardApprovals
+                  ? reviewResources
+                  : reviewResources.slice(0, 3)
                 ).map((resource) => (
                   <div
                     className="admin-review-card"
@@ -2050,22 +2087,17 @@ function AdminDashboard({ user, onLogout }) {
                     </div>
 
                     <div className="admin-review-information">
-                      <h4>
-                        {resource.title || "Untitled Resource"}
-                      </h4>
-
+                      <h4>{resource.title || "Untitled Resource"}</h4>
                       <p>
                         {resource.subject || "N/A"}
                         {" • "}
                         {resource.topic || "N/A"}
                       </p>
-
                       <p>
                         Year Level: {resource.yearLevel || "N/A"}
                         {" • "}
                         Uploaded by {resource.author || "Unknown"}
                       </p>
-
                       <small>
                         Date Added: {resource.dateAdded || "N/A"}
                         {" • "}
@@ -2083,22 +2115,18 @@ function AdminDashboard({ user, onLogout }) {
             </section>
 
             {/* FOOTER */}
+
             <footer className="admin-footer">
               © 2026 RLearn Hub — Rosemont Hills Montessori College
             </footer>
           </>
         ) : (
           <>
-            {/* OTHER PAGE HEADER */}
             <section className="admin-welcome">
               <div>
-                <span className="admin-label">
-                  Administration
-                </span>
+                <span className="admin-label">Administration</span>
                 <h2>{activePage}</h2>
-                <p>
-                  RLearn Hub administrator control panel.
-                </p>
+                <p>RLearn Hub administrator control panel.</p>
               </div>
             </section>
 
