@@ -1,4 +1,3 @@
-
 package com.rlearnhub.backend.controller;
 
 import com.rlearnhub.backend.dto.LoginResponse;
@@ -25,6 +24,7 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+
     private final BCryptPasswordEncoder passwordEncoder =
         new BCryptPasswordEncoder();
 
@@ -35,24 +35,37 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    // =========================
+    // LOGIN
+    // =========================
     @PostMapping("/login")
     public ResponseEntity<?> login(
             @RequestBody User loginRequest) {
 
         if (loginRequest.getEmail() == null
-                || loginRequest.getPassword() == null) {
+                || loginRequest.getPassword() == null
+                || loginRequest.getEmail().isBlank()
+                || loginRequest.getPassword().isBlank()) {
+
             return ResponseEntity.badRequest()
-                .body(Map.of("message",
-                    "Email and password are required."));
+                .body(Map.of(
+                    "message",
+                    "Email and password are required."
+                ));
         }
 
+        String email = loginRequest.getEmail().trim();
+
         Optional<User> result =
-            userRepository.findByEmail(loginRequest.getEmail());
+            userRepository.findByEmail(email);
 
         if (result.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message",
-                    "Invalid email or password."));
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                    "message",
+                    "Invalid email or password."
+                ));
         }
 
         User user = result.get();
@@ -60,9 +73,13 @@ public class AuthController {
         if (!passwordEncoder.matches(
                 loginRequest.getPassword(),
                 user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message",
-                    "Invalid email or password."));
+
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                    "message",
+                    "Invalid email or password."
+                ));
         }
 
         String token = jwtUtil.generateToken(
@@ -84,6 +101,10 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    // =========================
+    // PUBLIC REGISTRATION
+    // STUDENTS ONLY
+    // =========================
     @PostMapping("/register")
     public ResponseEntity<?> register(
             @RequestBody User newUser) {
@@ -96,43 +117,66 @@ public class AuthController {
                 || newUser.getEmail().isBlank()
                 || newUser.getPassword().isBlank()
                 || newUser.getRole().isBlank()) {
+
             return ResponseEntity.badRequest()
-                .body(Map.of("message",
-                    "All registration fields are required."));
+                .body(Map.of(
+                    "message",
+                    "All registration fields are required."
+                ));
         }
 
+        String name = newUser.getName().trim();
+        String email = newUser.getEmail().trim();
         String role = newUser.getRole().trim().toUpperCase();
 
-        if (!role.equals("STUDENT")
-                && !role.equals("TEACHER")
-                && !role.equals("ADMIN")) {
+        if (name.isBlank() || email.isBlank()) {
             return ResponseEntity.badRequest()
-                .body(Map.of("message", "Invalid role."));
+                .body(Map.of(
+                    "message",
+                    "Name and email cannot be blank."
+                ));
         }
 
-        if (userRepository.findByEmail(
-                newUser.getEmail().trim()).isPresent()) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message",
-                    "Email already exists."));
+        // Prevent public creation of Teacher and Admin accounts.
+        if (!"STUDENT".equals(role)) {
+            return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                    "message",
+                    "Public registration is only available for student accounts."
+                ));
         }
 
-        newUser.setName(newUser.getName().trim());
-        newUser.setEmail(newUser.getEmail().trim());
-        newUser.setRole(role);
+        // Check whether the email is already registered.
+        if (userRepository.findByEmail(email).isPresent()) {
+            return ResponseEntity.badRequest()
+                .body(Map.of(
+                    "message",
+                    "Email already exists."
+                ));
+        }
+
+        // Store the account with a BCrypt password hash.
+        newUser.setName(name);
+        newUser.setEmail(email);
+        newUser.setRole("STUDENT");
         newUser.setPassword(
             passwordEncoder.encode(newUser.getPassword())
         );
 
         User saved = userRepository.save(newUser);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(
+        // Return safe user information, never the password.
+        LoginResponse.UserInfo response =
             new LoginResponse.UserInfo(
                 saved.getId(),
                 saved.getName(),
                 saved.getEmail(),
                 saved.getRole()
-            )
-        );
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(response);
     }
 }

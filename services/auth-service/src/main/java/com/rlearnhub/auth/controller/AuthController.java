@@ -1,8 +1,11 @@
+
 package com.rlearnhub.auth.controller;
 
 import com.rlearnhub.auth.entity.User;
 import com.rlearnhub.auth.repository.UserRepository;
 import com.rlearnhub.auth.service.JwtService;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -13,11 +16,14 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175"
+})
 public class AuthController {
 
     private final UserRepository userRepository;
-
     private final JwtService jwtService;
 
     private final BCryptPasswordEncoder passwordEncoder =
@@ -25,8 +31,7 @@ public class AuthController {
 
     public AuthController(
             UserRepository userRepository,
-            JwtService jwtService
-    ) {
+            JwtService jwtService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
     }
@@ -34,109 +39,122 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User loginRequest) {
 
-        Optional<User> user =
-                userRepository.findByEmail(loginRequest.getEmail());
-
-        if (user.isEmpty()) {
-            return ResponseEntity
-                    .status(401)
-                    .body("Invalid email or password");
+        if (loginRequest.getEmail() == null
+                || loginRequest.getPassword() == null
+                || loginRequest.getEmail().isBlank()
+                || loginRequest.getPassword().isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "Email and password are required.")
+            );
         }
 
-        User existingUser = user.get();
+        String email = loginRequest.getEmail().trim();
 
-        /*
-         * Check the submitted password against
-         * the BCrypt password stored in PostgreSQL.
-         */
+        Optional<User> result = userRepository.findByEmail(email);
+
+        if (result.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Invalid email or password.")
+            );
+        }
+
+        User existingUser = result.get();
+
         if (!passwordEncoder.matches(
                 loginRequest.getPassword(),
-                existingUser.getPassword()
-        )) {
-
-            return ResponseEntity
-                    .status(401)
-                    .body("Invalid email or password");
+                existingUser.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Invalid email or password.")
+            );
         }
 
-        /*
-         * Generate JWT after successful login.
-         */
         String token = jwtService.generateToken(
                 existingUser.getId(),
                 existingUser.getEmail(),
                 existingUser.getRole()
         );
 
-        /*
-         * Return safe user information plus JWT.
-         *
-         * Password is NOT returned.
-         */
-        Map<String, Object> response =
-                new LinkedHashMap<>();
-
-        response.put("id", existingUser.getId());
-        response.put("name", existingUser.getName());
-        response.put("email", existingUser.getEmail());
-        response.put("role", existingUser.getRole());
-        response.put("token", token);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(toSafeResponse(existingUser, token));
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(
-            @RequestBody User newUser
-    ) {
+    public ResponseEntity<?> register(@RequestBody User newUser) {
 
-        Optional<User> existingUser =
-                userRepository.findByEmail(newUser.getEmail());
-
-        if (existingUser.isPresent()) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Email already exists");
+        if (newUser.getName() == null
+                || newUser.getEmail() == null
+                || newUser.getPassword() == null) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "Name, email, and password are required.")
+            );
         }
 
-        /*
-         * New users are STUDENTS by default.
-         */
+        String name = newUser.getName().trim();
+        String email = newUser.getEmail().trim();
+        String password = newUser.getPassword();
+
+        if (name.isBlank() || email.isBlank() || password.isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "Name, email, and password cannot be blank.")
+            );
+        }
+
+        if (password.length() < 8) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "Password must be at least 8 characters long.")
+            );
+        }
+
+        // Public registration must never grant elevated roles.
+        String requestedRole = newUser.getRole();
+
+        if (requestedRole != null
+                && !requestedRole.isBlank()
+                && !"STUDENT".equalsIgnoreCase(requestedRole.trim())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    Map.of("message",
+                            "Public registration is only available for student accounts.")
+            );
+        }
+
+        if (userRepository.findByEmail(email).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                    Map.of("message", "Email already exists.")
+            );
+        }
+
+        newUser.setName(name);
+        newUser.setEmail(email);
         newUser.setRole("STUDENT");
+        newUser.setPassword(passwordEncoder.encode(password));
 
-        /*
-         * Encrypt the password before saving it.
-         */
-        newUser.setPassword(
-                passwordEncoder.encode(
-                        newUser.getPassword()
-                )
-        );
+        User savedUser = userRepository.save(newUser);
 
-        User savedUser =
-                userRepository.save(newUser);
-
-        /*
-         * Generate a JWT for the newly registered user.
-         */
         String token = jwtService.generateToken(
                 savedUser.getId(),
                 savedUser.getEmail(),
                 savedUser.getRole()
         );
 
-        /*
-         * Return safe information only.
-         */
-        Map<String, Object> response =
-                new LinkedHashMap<>();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(toSafeResponse(savedUser, token));
+    }
 
-        response.put("id", savedUser.getId());
-        response.put("name", savedUser.getName());
-        response.put("email", savedUser.getEmail());
-        response.put("role", savedUser.getRole());
+    private Map<String, Object> toSafeResponse(
+            User user,
+            String token) {
+
+        Map<String, Object> response = new LinkedHashMap<>();
+
+        response.put("id", user.getId());
+        response.put("name", user.getName());
+        response.put("email", user.getEmail());
+        response.put("role", user.getRole());
         response.put("token", token);
 
-        return ResponseEntity.ok(response);
+        // Never return the password or its hash.
+        return response;
     }
 }
