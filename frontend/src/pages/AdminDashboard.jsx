@@ -457,6 +457,73 @@ const [newUser, setNewUser] = useState({
      LOAD USERS
   ========================================================= */
 
+  const handleToggleUserStatus = async (account) => {
+    const active = !account.active;
+
+    try {
+      const response = await fetch(
+        `${BACKEND_API}/api/admin/users/${account.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ active }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Unable to update account status.");
+      }
+
+      const updatedUser = await response.json();
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === updatedUser.id ? updatedUser : user
+        )
+      );
+      setUsersError("");
+    } catch (error) {
+      setUsersError(error.message || "Unable to update account status.");
+    }
+  };
+
+  const handleRemoveUser = async (account) => {
+    if (account.role?.toUpperCase() === "ADMIN") {
+      setUsersError("Administrator accounts cannot be removed here.");
+      return;
+    }
+
+    if (!window.confirm(`Remove the account for ${account.name}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${BACKEND_API}/api/admin/users/${account.id}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Unable to remove user.");
+      }
+
+      setUsers((current) =>
+        current.filter((user) => user.id !== account.id)
+      );
+      setUsersError("");
+    } catch (error) {
+      setUsersError(error.message || "Unable to remove user.");
+    }
+  };
+
+
   useEffect(() => {
     if (activePage !== "Manage Users") return;
 
@@ -1685,6 +1752,8 @@ const handleCreateUser = async (event) => {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
 
@@ -1704,6 +1773,27 @@ const handleCreateUser = async (event) => {
                           >
                             {account.role}
                           </span>
+                        </td>
+                        <td>
+                          {account.active ? "Active" : "Inactive"}
+                        </td>
+                        <td>
+                          {account.role?.toUpperCase() !== "ADMIN" && (
+                            <>
+                              <button
+                                type="button"
+                                className="admin-user-action admin-user-status-action" onClick={() => handleToggleUserStatus(account)}
+                              >
+                                {account.active ? "Deactivate" : "Activate"}
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-user-action admin-user-remove-action" onClick={() => handleRemoveUser(account)}
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1794,7 +1884,7 @@ const handleCreateUser = async (event) => {
                       <small>
                         <strong>File:</strong>{" "}
                         {resource.fileName || "Uploaded resource"}
-                        {" Ã¢â‚¬Â¢ "}
+                        { " | " }
                         <strong>Size:</strong>{" "}
                         {resource.size || "N/A"}
                       </small>
@@ -2242,8 +2332,8 @@ const handleCreateUser = async (event) => {
                     }
                   >
                     {showAllRecentResources
-                      ? "Show Less Ã¢â€ â€˜"
-                      : "View All Ã¢â€ â€™"}
+                      ? "Show Less"
+                      : "View All"}
                   </button>
                 )}
               </div>
@@ -2285,7 +2375,7 @@ const handleCreateUser = async (event) => {
                         <strong>{resource.title}</strong>
                         <span>
                           {resource.subject || "N/A"}
-                          {" Ã¢â‚¬Â¢ "}
+                          { " | " }
                           Uploaded by {resource.author || "Unknown"}
                         </span>
                       </div>
@@ -2318,8 +2408,8 @@ const handleCreateUser = async (event) => {
                     }
                   >
                     {showAllDashboardAnnouncements
-                      ? "Show Less Ã¢â€ â€˜"
-                      : "View All Ã¢â€ â€™"}
+                      ? "Show Less"
+                      : "View All"}
                   </button>
                 )}
               </div>
@@ -2389,8 +2479,8 @@ const handleCreateUser = async (event) => {
                     }
                   >
                     {showAllDashboardApprovals
-                      ? "Show Less Ã¢â€ â€˜"
-                      : "Review All Ã¢â€ â€™"}
+                      ? "Show Less"
+                      : "Review All"}
                   </button>
                 )}
               </div>
@@ -2437,17 +2527,17 @@ const handleCreateUser = async (event) => {
                       <h4>{resource.title || "Untitled Resource"}</h4>
                       <p>
                         {resource.subject || "N/A"}
-                        {" Ã¢â‚¬Â¢ "}
+                        { " | " }
                         {resource.topic || "N/A"}
                       </p>
                       <p>
                         Year Level: {resource.yearLevel || "N/A"}
-                        {" Ã¢â‚¬Â¢ "}
+                        { " | " }
                         Uploaded by {resource.author || "Unknown"}
                       </p>
                       <small>
                         Date Added: {resource.dateAdded || "N/A"}
-                        {" Ã¢â‚¬Â¢ "}
+                        { " | " }
                         Size: {resource.size || "N/A"}
                       </small>
                     </div>
@@ -2464,7 +2554,7 @@ const handleCreateUser = async (event) => {
             {/* FOOTER */}
 
             <footer className="admin-footer">
-              Ã‚Â© 2026 RLearn Hub Ã¢â‚¬â€ Rosemont Hills Montessori College
+              Â© 2026 RLearn Hub - Rosemont Hills Montessori College
             </footer>
           </>
         ) : (
@@ -2480,7 +2570,7 @@ const handleCreateUser = async (event) => {
             {renderPlaceholder()}
 
             <footer className="admin-footer">
-              Ã‚Â© 2026 RLearn Hub Ã¢â‚¬â€ Rosemont Hills Montessori College
+              Â© 2026 RLearn Hub - Rosemont Hills Montessori College
             </footer>
           </>
         )}

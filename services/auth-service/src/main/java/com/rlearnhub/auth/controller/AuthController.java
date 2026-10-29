@@ -1,6 +1,9 @@
 package com.rlearnhub.auth.controller;
 
-import com.rlearnhub.auth.entity.User;
+
+
+
+import org.springframework.web.bind.annotation.RequestHeader;import org.springframework.web.bind.annotation.PathVariable;import org.springframework.web.bind.annotation.GetMapping;import com.rlearnhub.auth.entity.User;
 import com.rlearnhub.auth.repository.UserRepository;
 import com.rlearnhub.auth.service.JwtService;
 
@@ -60,7 +63,13 @@ public class AuthController {
 
         User existingUser = result.get();
 
-        if (!passwordEncoder.matches(
+        if (!existingUser.isActive()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    Map.of("message",
+                            "Your account has been deactivated. Please contact the administrator.")
+            );
+        }
+if (!passwordEncoder.matches(
                 loginRequest.getPassword(),
                 existingUser.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
@@ -74,6 +83,34 @@ public class AuthController {
                 existingUser.getRole()
         );
 
+    @GetMapping("/internal/users/{userId}/active")
+    public ResponseEntity<?> checkAccountActive(
+            @PathVariable Long userId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+            String authorizationHeader) {
+
+        String expectedSecret = System.getenv("INTERNAL_SERVICE_SECRET");
+
+        if (expectedSecret == null || expectedSecret.isBlank()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("message", "Internal authentication is not configured."));
+        }
+
+        if (authorizationHeader == null
+                || !authorizationHeader.equals("Bearer " + expectedSecret)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Unauthorized."));
+        }
+
+        Optional<User> result = userRepository.findById(userId);
+
+        if (result.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Account not found."));
+        }
+
+        return ResponseEntity.ok(Map.of("active", result.get().isActive()));
+    }
         return ResponseEntity.ok(toSafeResponse(existingUser, token));
     }
 

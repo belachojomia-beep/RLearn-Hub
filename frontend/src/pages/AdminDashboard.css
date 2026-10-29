@@ -2705,3 +2705,73 @@ body.dark-mode .admin-delete-button,
     animation: none !important;
   }
 }
+/* =========================================================
+   MANAGE USERS ACTION BUTTON STYLES
+========================================================= */
+
+.admin-user-table td:last-child {
+  white-space: nowrap;
+}
+
+.admin-user-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 3px 4px 3px 0;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.18s ease,
+              color 0.18s ease,
+              transform 0.18s ease;
+}
+
+.admin-user-action:hover {
+  transform: translateY(-1px);
+}
+
+.admin-user-action:focus-visible {
+  outline: 3px solid rgba(212, 167, 44, 0.45);
+  outline-offset: 2px;
+}
+
+.admin-user-status-action {
+  color: var(--admin-navy, #0b2a4a);
+  background: #fbf3d9;
+  border-color: #e7d49b;
+}
+
+.admin-user-status-action:hover {
+  background: #f2e4b8;
+}
+
+.admin-user-remove-action {
+  color: #a52323;
+  background: #fff0f0;
+  border-color: #f0caca;
+}
+
+.admin-user-remove-action:hover {
+  color: #fff;
+  background: #b42323;
+  border-color: #b42323;
+}
+
+body.dark-mode .admin-user-status-action,
+.admin-layout.dark-mode .admin-user-status-action {
+  color: #ffe7a0;
+  background: #26364a;
+  border-color: #586477;
+}
+
+body.dark-mode .admin-user-remove-action,
+.admin-layout.dark-mode .admin-user-remove-action {
+  color: #ffb4b4;
+  background: #442626;
+  border-color: #704040;
+}

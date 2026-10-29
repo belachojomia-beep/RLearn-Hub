@@ -116,6 +116,61 @@ public class AdminController {
                 toResponse(saved)
         );
     }
+    @PatchMapping("/users/{id}/status")
+    public ResponseEntity<?> changeUserStatus(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+            String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> request) {
+
+        if (!isAdmin(authorization)) {
+            return unauthorizedOrForbidden(authorization);
+        }
+
+        Boolean active = request.get("active");
+        if (active == null) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "The active field is required.")
+            );
+        }
+
+        return userRepository.findById(id)
+                .map(user -> {
+                    user.setActive(active);
+                    User saved = userRepository.save(user);
+                    return ResponseEntity.ok(toResponse(saved));
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> removeUser(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+            String authorization,
+            @PathVariable Long id) {
+
+        if (!isAdmin(authorization)) {
+            return unauthorizedOrForbidden(authorization);
+        }
+
+        String adminEmail = jwtUtil.extractClaims(
+                authorization.substring(7).trim()
+        ).getSubject();
+
+        return userRepository.findById(id)
+                .map(user -> {
+                    if ("ADMIN".equalsIgnoreCase(user.getRole())
+                            || user.getEmail().equalsIgnoreCase(adminEmail)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of("message",
+                                        "Administrator accounts cannot be removed here."));
+                    }
+
+                    userRepository.delete(user);
+                    return ResponseEntity.noContent().build();
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     private boolean isAdmin(String authorization) {
         if (authorization == null
@@ -172,7 +227,8 @@ public class AdminController {
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole()
+                user.getRole(),
+                user.isActive()
         );
     }
 }

@@ -559,7 +559,7 @@ function App() {
             aria-label="Return to sign in"
             title="Return to sign in"
           >
-            <span aria-hidden="true">Ã—</span>
+            <span aria-hidden="true">&#215;</span>
           </button>
         )}
 
@@ -833,7 +833,7 @@ function App() {
       </div>
 
       <footer>
-        Â© 2026 RLearn Hub - Rosemont Hills Montessori College
+        © 2026 RLearn Hub - Rosemont Hills Montessori College
       </footer>
     </div>
   );
