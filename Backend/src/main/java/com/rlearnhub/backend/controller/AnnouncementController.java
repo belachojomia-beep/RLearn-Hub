@@ -1,14 +1,16 @@
+
 package com.rlearnhub.backend.controller;
 
 import com.rlearnhub.backend.entity.Announcement;
-import com.rlearnhub.backend.entity.Notification;
 import com.rlearnhub.backend.entity.User;
+import com.rlearnhub.backend.messaging.AnnouncementNotificationEvent;
+import com.rlearnhub.backend.messaging.AnnouncementNotificationPublisher;
 import com.rlearnhub.backend.repository.AnnouncementRepository;
-import com.rlearnhub.backend.repository.NotificationRepository;
 import com.rlearnhub.backend.repository.UserRepository;
 
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -17,17 +19,17 @@ import java.util.List;
 public class AnnouncementController {
 
     private final AnnouncementRepository announcementRepository;
-    private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final AnnouncementNotificationPublisher notificationPublisher;
 
     public AnnouncementController(
             AnnouncementRepository announcementRepository,
-            NotificationRepository notificationRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            AnnouncementNotificationPublisher notificationPublisher
     ) {
         this.announcementRepository = announcementRepository;
-        this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.notificationPublisher = notificationPublisher;
     }
 
     // =========================================================
@@ -44,30 +46,19 @@ public class AnnouncementController {
     // =========================================================
 
     @GetMapping("/{id}")
-    public Announcement getAnnouncementById(
-            @PathVariable Long id
-    ) {
+    public Announcement getAnnouncementById(@PathVariable Long id) {
         return announcementRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "Announcement not found"
-                        )
+                        new RuntimeException("Announcement not found")
                 );
     }
 
     // =========================================================
-    // CREATE ANNOUNCEMENT
+    // CREATE ANNOUNCEMENT AND PUBLISH RABBITMQ EVENT
     //
-    // ADMIN:
-    //   -> notify TEACHERS
-    //   -> notify STUDENTS
-    //
-    // TEACHER:
-    //   -> notify ADMINS
-    //   -> notify STUDENTS
-    //
-    // STUDENT:
-    //   -> NOT ALLOWED to create announcements
+    // ADMIN   -> TEACHERS + STUDENTS
+    // TEACHER -> ADMINS + STUDENTS
+    // STUDENT -> NOT ALLOWED
     // =========================================================
 
     @PostMapping
@@ -75,10 +66,7 @@ public class AnnouncementController {
             @RequestBody Announcement announcement
     ) {
 
-        // -----------------------------------------------------
-        // Validate announcement author
-        // -----------------------------------------------------
-
+        // Validate author name
         String authorName = announcement.getAuthor();
 
         if (authorName == null || authorName.trim().isEmpty()) {
@@ -87,25 +75,17 @@ public class AnnouncementController {
             );
         }
 
-        // -----------------------------------------------------
-        // Find the user who created the announcement
-        // -----------------------------------------------------
-
-        User author = userRepository
-                .findAll()
+        // Find the author
+        User author = userRepository.findAll()
                 .stream()
                 .filter(user ->
-                        user.getName() != null &&
-                        user.getName().equalsIgnoreCase(
-                                authorName.trim()
-                        )
+                        user.getName() != null
+                                && user.getName().equalsIgnoreCase(
+                                        authorName.trim()
+                                )
                 )
                 .findFirst()
                 .orElse(null);
-
-        // -----------------------------------------------------
-        // Make sure the author exists
-        // -----------------------------------------------------
 
         if (author == null) {
             throw new RuntimeException(
@@ -113,10 +93,7 @@ public class AnnouncementController {
             );
         }
 
-        // -----------------------------------------------------
-        // Get author role
-        // -----------------------------------------------------
-
+        // Validate author role
         String authorRole = author.getRole();
 
         if (authorRole == null) {
@@ -127,175 +104,74 @@ public class AnnouncementController {
 
         authorRole = authorRole.trim().toUpperCase();
 
-        // -----------------------------------------------------
-        // STUDENTS CANNOT CREATE ANNOUNCEMENTS
-        // -----------------------------------------------------
-
         if ("STUDENT".equals(authorRole)) {
             throw new RuntimeException(
                     "Students are not allowed to create announcements."
             );
         }
 
-        // -----------------------------------------------------
-        // Only ADMIN and TEACHER can create announcements
-        // -----------------------------------------------------
-
         if (!"ADMIN".equals(authorRole)
                 && !"TEACHER".equals(authorRole)) {
-
             throw new RuntimeException(
                     "Only administrators and teachers can create announcements."
             );
         }
 
-        // -----------------------------------------------------
-        // Save announcement
-        // -----------------------------------------------------
-
+        // Save the announcement first
         Announcement savedAnnouncement =
                 announcementRepository.save(announcement);
 
-        // -----------------------------------------------------
-        // Notification message
-        // -----------------------------------------------------
-
-        String notificationTitle =
-                "New Announcement";
-
-        String notificationMessage =
-                savedAnnouncement.getTitle()
-                        + ": "
-                        + savedAnnouncement.getMessage();
-
-        String notificationDate =
-                savedAnnouncement.getDatePosted();
-
-        // =====================================================
-        // ADMIN CREATES ANNOUNCEMENT
-        // Notify:
-        //   1. ALL TEACHERS
-        //   2. ALL STUDENTS
-        // =====================================================
+        // Determine eligible recipients
+        List<User> recipients = new ArrayList<>();
 
         if ("ADMIN".equals(authorRole)) {
-
-            List<User> teachers =
-                    userRepository.findByRoleIgnoreCase("TEACHER");
-
-            List<User> students =
-                    userRepository.findByRoleIgnoreCase("STUDENT");
-
-            // Notify teachers
-            for (User teacher : teachers) {
-
-                createNotification(
-                        teacher.getEmail(),
-                        notificationTitle,
-                        notificationMessage,
-                        notificationDate
-                );
-            }
-
-            // Notify students
-            for (User student : students) {
-
-                createNotification(
-                        student.getEmail(),
-                        notificationTitle,
-                        notificationMessage,
-                        notificationDate
-                );
-            }
+            recipients.addAll(
+                    userRepository.findByRoleIgnoreCase("TEACHER")
+            );
+            recipients.addAll(
+                    userRepository.findByRoleIgnoreCase("STUDENT")
+            );
+        } else if ("TEACHER".equals(authorRole)) {
+            recipients.addAll(
+                    userRepository.findByRoleIgnoreCase("ADMIN")
+            );
+            recipients.addAll(
+                    userRepository.findByRoleIgnoreCase("STUDENT")
+            );
         }
 
-        // =====================================================
-        // TEACHER CREATES ANNOUNCEMENT
-        // Notify:
-        //   1. ALL ADMINS
-        //   2. ALL STUDENTS
-        // =====================================================
+        // Collect valid, unique recipient emails
+        List<String> recipientEmails = recipients.stream()
+                .map(User::getEmail)
+                .filter(email ->
+                        email != null && !email.isBlank()
+                )
+                .map(String::trim)
+                .distinct()
+                .toList();
 
-        if ("TEACHER".equals(authorRole)) {
+        // Publish one event for the Notification Service
+        if (!recipientEmails.isEmpty()) {
 
-            List<User> admins =
-                    userRepository.findByRoleIgnoreCase("ADMIN");
+            AnnouncementNotificationEvent event =
+                    new AnnouncementNotificationEvent();
 
-            List<User> students =
-                    userRepository.findByRoleIgnoreCase("STUDENT");
+            event.setRecipientEmails(recipientEmails);
+            event.setTitle("New Announcement");
+            event.setMessage(
+                    savedAnnouncement.getTitle()
+                            + ": "
+                            + savedAnnouncement.getMessage()
+            );
+            event.setType("ANNOUNCEMENT");
+            event.setDateCreated(
+                    savedAnnouncement.getDatePosted()
+            );
 
-            // Notify admins
-            for (User admin : admins) {
-
-                createNotification(
-                        admin.getEmail(),
-                        notificationTitle,
-                        notificationMessage,
-                        notificationDate
-                );
-            }
-
-            // Notify students
-            for (User student : students) {
-
-                createNotification(
-                        student.getEmail(),
-                        notificationTitle,
-                        notificationMessage,
-                        notificationDate
-                );
-            }
+            notificationPublisher.publish(event);
         }
 
         return savedAnnouncement;
-    }
-
-    // =========================================================
-    // CREATE NOTIFICATION HELPER
-    // =========================================================
-
-    private void createNotification(
-            String userEmail,
-            String title,
-            String message,
-            String dateCreated
-    ) {
-
-        if (userEmail == null || userEmail.trim().isEmpty()) {
-            return;
-        }
-
-        Notification notification =
-                new Notification();
-
-        notification.setUserEmail(
-                userEmail
-        );
-
-        notification.setTitle(
-                title
-        );
-
-        notification.setMessage(
-                message
-        );
-
-        notification.setType(
-                "ANNOUNCEMENT"
-        );
-
-        // Every new notification starts UNREAD
-        notification.setReadStatus(
-                false
-        );
-
-        notification.setDateCreated(
-                dateCreated
-        );
-
-        notificationRepository.save(
-                notification
-        );
     }
 
     // =========================================================
@@ -316,25 +192,12 @@ public class AnnouncementController {
                                 )
                         );
 
-        announcement.setTitle(
-                updatedAnnouncement.getTitle()
-        );
+        announcement.setTitle(updatedAnnouncement.getTitle());
+        announcement.setMessage(updatedAnnouncement.getMessage());
+        announcement.setAuthor(updatedAnnouncement.getAuthor());
+        announcement.setDatePosted(updatedAnnouncement.getDatePosted());
 
-        announcement.setMessage(
-                updatedAnnouncement.getMessage()
-        );
-
-        announcement.setAuthor(
-                updatedAnnouncement.getAuthor()
-        );
-
-        announcement.setDatePosted(
-                updatedAnnouncement.getDatePosted()
-        );
-
-        return announcementRepository.save(
-                announcement
-        );
+        return announcementRepository.save(announcement);
     }
 
     // =========================================================
@@ -342,9 +205,7 @@ public class AnnouncementController {
     // =========================================================
 
     @DeleteMapping("/{id}")
-    public void deleteAnnouncement(
-            @PathVariable Long id
-    ) {
+    public void deleteAnnouncement(@PathVariable Long id) {
         announcementRepository.deleteById(id);
     }
 }

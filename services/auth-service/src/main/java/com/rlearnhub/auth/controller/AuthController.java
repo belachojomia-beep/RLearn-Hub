@@ -1,10 +1,10 @@
-
 package com.rlearnhub.auth.controller;
 
 import com.rlearnhub.auth.entity.User;
 import com.rlearnhub.auth.repository.UserRepository;
 import com.rlearnhub.auth.service.JwtService;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -140,6 +140,108 @@ public class AuthController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(toSafeResponse(savedUser, token));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader(
+                    value = HttpHeaders.AUTHORIZATION,
+                    required = false
+            ) String authorizationHeader,
+            @RequestBody Map<String, String> request) {
+
+        // Require a Bearer token.
+        if (authorizationHeader == null
+                || !authorizationHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Authentication is required.")
+            );
+        }
+
+        String token = authorizationHeader.substring(7);
+
+        // Validate the JWT inside the auth service.
+        if (!jwtService.isTokenValid(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Your session is invalid or expired.")
+            );
+        }
+
+        // Identify the account using the signed JWT.
+        Long userId;
+
+        try {
+            userId = jwtService.extractUserId(token);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Invalid authentication token.")
+            );
+        }
+
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Invalid authentication token.")
+            );
+        }
+
+        if (request == null) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "Password details are required.")
+            );
+        }
+
+        String currentPassword = request.get("currentPassword");
+        String newPassword = request.get("newPassword");
+
+        if (currentPassword == null || currentPassword.isBlank()
+                || newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "Current password and new password are required.")
+            );
+        }
+
+        if (newPassword.length() < 8) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "New password must be at least 8 characters long.")
+            );
+        }
+
+        Optional<User> result = userRepository.findById(userId);
+
+        if (result.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Account not found.")
+            );
+        }
+
+        User user = result.get();
+
+        // Verify the current password.
+        if (!passwordEncoder.matches(
+                currentPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "Current password is incorrect.")
+            );
+        }
+
+        // Reject a password that is identical to the current one.
+        if (passwordEncoder.matches(
+                newPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message",
+                            "Choose a new password different from your current password.")
+            );
+        }
+
+        // Hash the new password before saving it.
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(
+                Map.of("message", "Password changed successfully.")
+        );
     }
 
     private Map<String, Object> toSafeResponse(

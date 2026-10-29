@@ -164,7 +164,7 @@ const canPreviewResource = (resource, blobType = "") => {
    ADMIN DASHBOARD
 ========================================================= */
 
-function AdminDashboard({ user, onLogout }) {
+function AdminDashboard({ user, onLogout, onChangePassword }) {
   const adminName = user?.name || "Administrator";
 
   const [activePage, setActivePage] = useState("Dashboard");
@@ -221,9 +221,25 @@ function AdminDashboard({ user, onLogout }) {
 
   /* Manage Users */
 
-  const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersError, setUsersError] = useState("");
+ /* =========================================================
+   MANAGE USERS + CREATE ACCOUNT
+========================================================= */
+
+const [users, setUsers] = useState([]);
+const [usersLoading, setUsersLoading] = useState(false);
+const [usersError, setUsersError] = useState("");
+
+const [showCreateUserForm, setShowCreateUserForm] = useState(false);
+const [userSaving, setUserSaving] = useState(false);
+const [createUserError, setCreateUserError] = useState("");
+const [createUserSuccess, setCreateUserSuccess] = useState("");
+
+const [newUser, setNewUser] = useState({
+  name: "",
+  email: "",
+  password: "",
+  role: "TEACHER",
+});
 
   /* Review Resources */
 
@@ -497,6 +513,166 @@ function AdminDashboard({ user, onLogout }) {
       cancelled = true;
     };
   }, [activePage]);
+
+  /* =========================================================
+   CREATE STUDENT OR TEACHER ACCOUNT
+========================================================= */
+
+const handleCreateUser = async (event) => {
+  event.preventDefault();
+
+  const name = newUser.name.trim();
+  const email = newUser.email.trim().toLowerCase();
+  const password = newUser.password;
+  const role = newUser.role.toUpperCase();
+
+  setCreateUserError("");
+  setCreateUserSuccess("");
+
+  if (!name || !email || !password || !role) {
+    setCreateUserError("Please complete all fields.");
+    return;
+  }
+
+  if (!["STUDENT", "TEACHER"].includes(role)) {
+    setCreateUserError(
+      "Only Student and Teacher accounts can be created here."
+    );
+    return;
+  }
+
+  if (password.length < 8) {
+    setCreateUserError(
+      "The password must contain at least 8 characters."
+    );
+    return;
+  }
+
+  const token = getToken();
+
+  if (!token) {
+    setCreateUserError(
+      "Your login session is missing. Please log in again."
+    );
+    return;
+  }
+
+  setUserSaving(true);
+
+  try {
+    const response = await fetch(`${BACKEND_API}/api/admin/users`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+      }),
+    });
+
+    if (response.status === 401) {
+      throw new Error(
+        "Your login session is invalid or has expired."
+      );
+    }
+
+    if (response.status === 403) {
+      throw new Error(
+        "Only an authorized administrator can create accounts."
+      );
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        "An account with this email address already exists."
+      );
+    }
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+
+      throw new Error(
+        responseText ||
+          `Failed to create the account. Server returned ${response.status}.`
+      );
+    }
+
+    const responseText = await response.text();
+    let createdUser = null;
+
+    if (responseText) {
+      try {
+        createdUser = JSON.parse(responseText);
+      } catch {
+        createdUser = null;
+      }
+    }
+
+    // Add the returned account to the table without exposing its password.
+    if (
+      createdUser &&
+      createdUser.id !== undefined &&
+      createdUser.id !== null
+    ) {
+      setUsers((current) => [
+        ...current.filter(
+          (account) => account.id !== createdUser.id
+        ),
+        {
+          id: createdUser.id,
+          name: createdUser.name || name,
+          email: createdUser.email || email,
+          role: createdUser.role || role,
+        },
+      ]);
+    } else {
+      // If the server did not return the created user, reload the list.
+      const usersResponse = await fetch(
+        `${BACKEND_API}/api/admin/users`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!usersResponse.ok) {
+        throw new Error(
+          "The account may have been created, but the user list could not be refreshed. Please reload Manage Users."
+        );
+      }
+
+      const usersData = await usersResponse.json();
+
+      setUsers(Array.isArray(usersData) ? usersData : []);
+    }
+
+    setCreateUserSuccess(
+      `${role === "TEACHER" ? "Teacher" : "Student"} account created successfully.`
+    );
+
+    setNewUser({
+      name: "",
+      email: "",
+      password: "",
+      role: "TEACHER",
+    });
+
+    setShowCreateUserForm(false);
+  } catch (error) {
+    console.error("Error creating user:", error);
+
+    setCreateUserError(
+      error.message || "Unable to create the account."
+    );
+  } finally {
+    setUserSaving(false);
+  }
+};
 
   /* =========================================================
      LOAD REVIEW RESOURCES
@@ -1247,6 +1423,7 @@ function AdminDashboard({ user, onLogout }) {
     "Review Resources",
     "Reports",
     "Announcements",
+    "Change Password",
   ];
 
   /* =========================================================
@@ -1315,19 +1492,188 @@ function AdminDashboard({ user, onLogout }) {
               <div>
                 <h3>Manage Users</h3>
                 <p>
-                  Manage student, teacher, and administrator accounts.
+                  View registered users and create Student or Teacher
+                  accounts.
                 </p>
               </div>
+
+              <button
+                type="button"
+                className="admin-create-announcement-button"
+                onClick={() => {
+                  setCreateUserError("");
+                  setCreateUserSuccess("");
+                  setShowCreateUserForm((current) => !current);
+                }}
+                disabled={userSaving}
+              >
+                {showCreateUserForm
+                  ? "Cancel Creation"
+                  : "+ Create User"}
+              </button>
             </div>
 
-            {usersLoading && <p>Loading users...</p>}
+            {createUserSuccess && (
+              <div
+                className="admin-success-message"
+                role="status"
+              >
+                {createUserSuccess}
+              </div>
+            )}
+
+            {createUserError && (
+              <div
+                className="admin-error-message"
+                role="alert"
+              >
+                {createUserError}
+              </div>
+            )}
+
+            {showCreateUserForm && (
+              <form
+                className="admin-announcement-form admin-create-user-form"
+                onSubmit={handleCreateUser}
+              >
+                <div className="admin-announcement-form-header">
+                  <div>
+                    <h4>Create User Account</h4>
+                    <p>
+                      Create an account for a student or teacher.
+                      Passwords are processed by the backend.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="newUserName">Full Name</label>
+                  <input
+                    id="newUserName"
+                    type="text"
+                    autoComplete="name"
+                    value={newUser.name}
+                    onChange={(event) =>
+                      setNewUser((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter full name"
+                    maxLength={120}
+                    disabled={userSaving}
+                    required
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="newUserEmail">Email Address</label>
+                  <input
+                    id="newUserEmail"
+                    type="email"
+                    autoComplete="email"
+                    value={newUser.email}
+                    onChange={(event) =>
+                      setNewUser((current) => ({
+                        ...current,
+                        email: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter email address"
+                    maxLength={254}
+                    disabled={userSaving}
+                    required
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="newUserPassword">Temporary Password</label>
+                  <input
+                    id="newUserPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newUser.password}
+                    onChange={(event) =>
+                      setNewUser((current) => ({
+                        ...current,
+                        password: event.target.value,
+                      }))
+                    }
+                    placeholder="At least 8 characters"
+                    minLength={8}
+                    maxLength={128}
+                    disabled={userSaving}
+                    required
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="newUserRole">Account Role</label>
+                  <select
+                    id="newUserRole"
+                    value={newUser.role}
+                    onChange={(event) =>
+                      setNewUser((current) => ({
+                        ...current,
+                        role: event.target.value,
+                      }))
+                    }
+                    disabled={userSaving}
+                    required
+                  >
+                    <option value="TEACHER">Teacher</option>
+                    <option value="STUDENT">Student</option>
+                  </select>
+                </div>
+
+                <div className="admin-create-user-notice">
+                  Administrator accounts cannot be created from this form.
+                </div>
+
+                <div className="admin-announcement-form-actions">
+                  <button
+                    type="button"
+                    className="admin-cancel-button"
+                    onClick={() => {
+                      setShowCreateUserForm(false);
+                      setCreateUserError("");
+                      setNewUser({
+                        name: "",
+                        email: "",
+                        password: "",
+                        role: "TEACHER",
+                      });
+                    }}
+                    disabled={userSaving}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="admin-save-button"
+                    disabled={userSaving}
+                  >
+                    {userSaving ? "Creating Account..." : "Create Account"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {usersLoading && (
+              <p className="admin-loading-message">Loading users...</p>
+            )}
 
             {usersError && (
-              <div className="admin-error-message">{usersError}</div>
+              <div className="admin-error-message" role="alert">
+                {usersError}
+              </div>
             )}
 
             {!usersLoading && !usersError && users.length === 0 && (
-              <p>No users found.</p>
+              <div className="admin-empty-message">
+                No users found.
+              </div>
             )}
 
             {!usersLoading && !usersError && users.length > 0 && (
@@ -1353,7 +1699,7 @@ function AdminDashboard({ user, onLogout }) {
                         <td>
                           <span
                             className={`admin-role-badge ${
-                              account.role?.toLowerCase() || ""
+                              account.role?.toLowerCase() || "user"
                             }`}
                           >
                             {account.role}
@@ -1448,7 +1794,7 @@ function AdminDashboard({ user, onLogout }) {
                       <small>
                         <strong>File:</strong>{" "}
                         {resource.fileName || "Uploaded resource"}
-                        {" • "}
+                        {" Ã¢â‚¬Â¢ "}
                         <strong>Size:</strong>{" "}
                         {resource.size || "N/A"}
                       </small>
@@ -1795,21 +2141,22 @@ function AdminDashboard({ user, onLogout }) {
               className={`admin-nav-item ${
                 activePage === item ? "active" : ""
               }`}
-              onClick={() => setActivePage(item)}
+              onClick={() => item === "Change Password" ? onChangePassword() : setActivePage(item)}
             >
               {item}
             </button>
           ))}
         </nav>
 
-        <button
-          type="button"
-          className="admin-logout"
-          onClick={onLogout}
-        >
-          Logout
-        </button>
-      </aside>
+            <button
+              type="button"
+              className="admin-logout"
+              onClick={onLogout}
+            >
+              Logout
+            </button>
+
+            </aside>
 
       {/* MAIN CONTENT */}
 
@@ -1895,8 +2242,8 @@ function AdminDashboard({ user, onLogout }) {
                     }
                   >
                     {showAllRecentResources
-                      ? "Show Less ↑"
-                      : "View All →"}
+                      ? "Show Less Ã¢â€ â€˜"
+                      : "View All Ã¢â€ â€™"}
                   </button>
                 )}
               </div>
@@ -1938,7 +2285,7 @@ function AdminDashboard({ user, onLogout }) {
                         <strong>{resource.title}</strong>
                         <span>
                           {resource.subject || "N/A"}
-                          {" • "}
+                          {" Ã¢â‚¬Â¢ "}
                           Uploaded by {resource.author || "Unknown"}
                         </span>
                       </div>
@@ -1971,8 +2318,8 @@ function AdminDashboard({ user, onLogout }) {
                     }
                   >
                     {showAllDashboardAnnouncements
-                      ? "Show Less ↑"
-                      : "View All →"}
+                      ? "Show Less Ã¢â€ â€˜"
+                      : "View All Ã¢â€ â€™"}
                   </button>
                 )}
               </div>
@@ -2042,8 +2389,8 @@ function AdminDashboard({ user, onLogout }) {
                     }
                   >
                     {showAllDashboardApprovals
-                      ? "Show Less ↑"
-                      : "Review All →"}
+                      ? "Show Less Ã¢â€ â€˜"
+                      : "Review All Ã¢â€ â€™"}
                   </button>
                 )}
               </div>
@@ -2090,17 +2437,17 @@ function AdminDashboard({ user, onLogout }) {
                       <h4>{resource.title || "Untitled Resource"}</h4>
                       <p>
                         {resource.subject || "N/A"}
-                        {" • "}
+                        {" Ã¢â‚¬Â¢ "}
                         {resource.topic || "N/A"}
                       </p>
                       <p>
                         Year Level: {resource.yearLevel || "N/A"}
-                        {" • "}
+                        {" Ã¢â‚¬Â¢ "}
                         Uploaded by {resource.author || "Unknown"}
                       </p>
                       <small>
                         Date Added: {resource.dateAdded || "N/A"}
-                        {" • "}
+                        {" Ã¢â‚¬Â¢ "}
                         Size: {resource.size || "N/A"}
                       </small>
                     </div>
@@ -2117,7 +2464,7 @@ function AdminDashboard({ user, onLogout }) {
             {/* FOOTER */}
 
             <footer className="admin-footer">
-              © 2026 RLearn Hub — Rosemont Hills Montessori College
+              Ã‚Â© 2026 RLearn Hub Ã¢â‚¬â€ Rosemont Hills Montessori College
             </footer>
           </>
         ) : (
@@ -2133,7 +2480,7 @@ function AdminDashboard({ user, onLogout }) {
             {renderPlaceholder()}
 
             <footer className="admin-footer">
-              © 2026 RLearn Hub — Rosemont Hills Montessori College
+              Ã‚Â© 2026 RLearn Hub Ã¢â‚¬â€ Rosemont Hills Montessori College
             </footer>
           </>
         )}

@@ -2241,6 +2241,117 @@ body.dark-mode .admin-delete-button,
   color: #ffb4b8;
 }
 
+  /* =========================================================
+   CREATE USER FORM
+========================================================= */
+
+.admin-create-user-form {
+  margin-bottom: 22px;
+}
+
+.admin-create-user-form select {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+
+  background: var(--admin-white);
+  color: var(--admin-text);
+
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.admin-create-user-form select:focus {
+  border-color: var(--admin-gold);
+  box-shadow: 0 0 0 3px rgba(212, 167, 44, 0.12);
+}
+
+.admin-create-user-form input:disabled,
+.admin-create-user-form select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.admin-create-user-notice {
+  margin: 0 0 17px;
+  padding: 11px 13px;
+
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+
+  background: var(--admin-background);
+  color: var(--admin-muted);
+
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-announcement-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.admin-cancel-button,
+.admin-save-button {
+  min-height: 38px;
+  padding: 9px 15px;
+
+  border-radius: 7px;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.admin-cancel-button {
+  border: 1px solid var(--admin-border);
+  background: var(--admin-white);
+  color: var(--admin-text);
+}
+
+.admin-cancel-button:hover:not(:disabled) {
+  background: var(--admin-background);
+}
+
+.admin-save-button {
+  border: 1px solid var(--admin-gold);
+  background: var(--admin-gold);
+  color: var(--admin-navy);
+}
+
+.admin-save-button:hover:not(:disabled) {
+  background: var(--admin-gold-dark);
+  border-color: var(--admin-gold-dark);
+}
+
+.admin-cancel-button:disabled,
+.admin-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .admin-create-user-form {
+    padding: 14px;
+  }
+
+  .admin-announcement-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .admin-cancel-button,
+  .admin-save-button {
+    width: 100%;
+  }
+}
 /* =========================================================
    FOOTER
 ========================================================= */

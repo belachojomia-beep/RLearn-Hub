@@ -88,6 +88,7 @@ function Dashboard({
   onAnnouncements,
   onUploadResource,
   onCreateAnnouncement,
+  onChangePassword,
 }) {
   const userRole = String(user?.role || "STUDENT").toUpperCase();
   const isTeacher = userRole === "TEACHER";
@@ -405,6 +406,15 @@ function Dashboard({
             </>
           )}
         </nav>
+        <button
+          type="button"
+          className="nav-item"
+          onClick={onChangePassword}
+        >
+          <span className="nav-icon">🔒</span>
+          <span>Change Password</span>
+        </button>
+
         <button
           type="button"
           className="dashboard-logout"

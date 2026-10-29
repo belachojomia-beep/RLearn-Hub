@@ -3,3 +3,14 @@
 .env
 .env.*
 !.env.example
+
+# Local test logs
+**/*-test.log
+**/backend-test.log
+**/notification-test.log
+
+# Local backup copies
+*.backup-*
+
+# Temporary frontend cleanup backup
+frontend/src/App.jsx.before-eof-cleanup

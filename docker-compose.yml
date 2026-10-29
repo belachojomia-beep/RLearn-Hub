@@ -3,17 +3,27 @@ services:
     image: postgres:17
     container_name: rlearnhub-postgres
     restart: unless-stopped
-
     environment:
       POSTGRES_DB: rlearnhub
       POSTGRES_USER: rlearnhub
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
-
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rlearnhub-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
